@@ -216,10 +216,10 @@ const BankInfoPage = () => {
                             >
                                 <Box display="flex" alignItems="center" gap={2}>
                                     <Box>
-                                        <Typography variant="body2" fontWeight={600}>
+                                        <Typography variant="body2" fontWeight={600} align='left' display='block'>
                                             {account.bankName}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" color="text.secondary" align='left' display='block'>
                                             Opening balance: {formatCurrency(account.openingBalance)}
                                         </Typography>
                                     </Box>
@@ -277,7 +277,8 @@ const BankInfoPage = () => {
                             py: 1.5,
                             bgcolor: 'background.default',
                             borderBottom: '1px solid',
-                            borderColor: 'divider'
+                            borderColor: 'divider',
+                            alignContent: 'center'
                         }}
                     >
                         {[
@@ -332,14 +333,14 @@ const BankInfoPage = () => {
                                 }}
                             >
                                 <Box>
-                                    <Typography variant="body2" fontWeight={600}>
+                                    <Typography variant="body2" fontWeight={600} align='left' display='block'>
                                         {account.bankName}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary">
+                                    <Typography variant="caption" color="text.secondary" align='left' display='block'>
                                         {account.accountType}
                                     </Typography>
                                 </Box>
-                                <Typography variant="body2" textAlign="right">
+                                <Typography variant="body2" textAlign="right" align='left' display='block'>
                                     {formatCurrency(account.initialOpeningBalance)}
                                 </Typography>
                                 <Typography
@@ -347,6 +348,8 @@ const BankInfoPage = () => {
                                     textAlign="right"
                                     color="success.main"
                                     fontWeight={600}
+                                    align='left'
+                                    display='block'
                                 >
                                     {formatCurrency(account.totalDeposits)}
                                 </Typography>
@@ -355,6 +358,8 @@ const BankInfoPage = () => {
                                     textAlign="right"
                                     color="success.main"
                                     fontWeight={600}
+                                    align='left'
+                                    display='block'
                                 >
                                     {formatCurrency(account.totalInterest)}
                                 </Typography>
@@ -363,6 +368,8 @@ const BankInfoPage = () => {
                                     textAlign="right"
                                     color="error.main"
                                     fontWeight={600}
+                                    align='left'
+                                    display='block'
                                 >
                                     {formatCurrency(account.totalWithdrawals)}
                                 </Typography>
@@ -370,6 +377,8 @@ const BankInfoPage = () => {
                                     variant="body2"
                                     textAlign="right"
                                     fontWeight={600}
+                                    align='left'
+                                    display='block'
                                 >
                                     {formatCurrency(account.currentBalance)}
                                 </Typography>
@@ -377,6 +386,8 @@ const BankInfoPage = () => {
                                     variant="body2"
                                     textAlign="right"
                                     color="text.secondary"
+                                    align='left'
+                                    display='block'
                                 >
                                     {account.monthsTracked}{' '}
                                     {account.monthsTracked === 1 ? 'month' : 'months'}

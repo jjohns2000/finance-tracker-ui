@@ -13,11 +13,11 @@ const SectionHeader = ({ title, subtitle, action }) => {
             }}
         >
             <Box>
-                <Typography variant="h6" fontWeight={700}>
+                <Typography variant="h6" fontWeight={700} align='left'>
                     {title}
                 </Typography>
                 {subtitle && (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" align='left' display='block'>
                         {subtitle}
                     </Typography>
                 )}
