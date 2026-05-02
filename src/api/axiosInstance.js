@@ -1,13 +1,12 @@
 import axios from 'axios';
 
 const axiosInstance = axios.create({
-    baseURL: '/',
+    baseURL: import.meta.env.VITE_API_BASE_URL,
     headers: {
         'Content-Type': 'application/json'
     }
 });
 
-// Attach token to every request automatically
 axiosInstance.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
@@ -19,7 +18,6 @@ axiosInstance.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Handle 401 responses globally
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
