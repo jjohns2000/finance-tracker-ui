@@ -44,6 +44,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import Chip from '@mui/material/Chip';
 import { Block } from '@mui/icons-material';
+import CountUp from '../components/CountUp';
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -351,15 +352,14 @@ const IncomePage = () => {
                     variant="body2"
                     fontWeight={600}
                     color={positive ? 'success.main' : 'error.main'}
-                    align='center' display='block'
                 >
-                    {formatCurrency(value)}
+                    <CountUp value={Math.abs(value ?? 0)} prefix="$" duration={1200} />
                 </Typography>
             </Box>
         );
     };
 
-    const MetricBox = ({ label, value, color }) => (
+    const MetricBox = ({ label, value, color, rawValue }) => (
         <Box
             sx={{
                 p: 2,
@@ -378,7 +378,7 @@ const IncomePage = () => {
                 mt={0.5}
                 color={color || 'text.primary'}
             >
-                {value}
+                <CountUp value={rawValue ?? 0} prefix="$" duration={1200} />
             </Typography>
         </Box>
     );
@@ -468,16 +468,16 @@ const IncomePage = () => {
                             >
                                 <MetricBox
                                     label="Opening balance"
-                                    value={formatCurrency(aggregate?.totalOpeningBalance)}
+                                    rawValue={aggregate?.totalOpeningBalance}
                                 />
                                 <MetricBox
                                     label="Total deposit"
-                                    value={formatCurrency(aggregate?.totalDeposit)}
+                                    rawValue={aggregate?.totalDeposit}
                                     color="success.main"
                                 />
                                 <MetricBox
                                     label="Closing balance"
-                                    value={formatCurrency(aggregate?.totalClosingBalance)}
+                                    rawValue={aggregate?.totalClosingBalance}
                                 />
                                 <Box
                                     sx={{
@@ -546,7 +546,7 @@ const IncomePage = () => {
                                             variant="caption"
                                             color="text.secondary"
                                             fontWeight={600}
-                                            textAlign={i >= 2 ? 'right' : 'left'}
+                                            textAlign="left"
                                         >
                                             {col}
                                         </Typography>
@@ -562,49 +562,51 @@ const IncomePage = () => {
                                     </Box>
                                 ) : (
                                     accounts.map((account, index) => {
-                                        const data = getSummaryForAccount(account);
-                                        return (
-                                            <Box
-                                                key={account.publicId}
-                                                sx={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                                                    px: 2,
-                                                    py: 1.5,
-                                                    borderBottom: index < accounts.length - 1
-                                                        ? '1px solid'
-                                                        : 'none',
-                                                    borderColor: 'divider',
-                                                    '&:hover': {
-                                                        bgcolor: 'background.default'
-                                                    }
-                                                }}
+                                    const data = getSummaryForAccount(account);
+                                    return (
+                                        <Box
+                                            key={account.publicId}
+                                            onClick={() => handleOpenEdit(account)}
+                                            sx={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '2fr 1fr 1fr 1fr',
+                                                px: 2,
+                                                py: 1.5,
+                                                alignItems: 'center',
+                                                cursor: 'pointer',
+                                                borderBottom: index < accounts.length - 1
+                                                    ? '1px solid' : 'none',
+                                                borderColor: 'divider',
+                                                '&:hover': {
+                                                    bgcolor: 'action.hover'
+                                                }
+                                            }}
+                                        >
+                                            <Typography variant="body2" fontWeight={500} noWrap>
+                                                {account.bankName}
+                                            </Typography>
+                                            <Typography variant="body2" color="text.secondary" noWrap>
+                                                {account.accountType}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight={600}
+                                                color="success.main"
+                                                textAlign="right"
                                             >
-                                                <Typography variant="body2" fontWeight={500} noWrap>
-                                                    {account.bankName}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary" noWrap>
-                                                    {account.accountType}
-                                                </Typography>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={600}
-                                                    color="success.main"
-                                                    textAlign="right"
-                                                >
-                                                    {formatCurrency(data?.deposit)}
-                                                </Typography>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={600}
-                                                    color="success.main"
-                                                    textAlign="right"
-                                                >
-                                                    {formatCurrency(data?.interest)}
-                                                </Typography>
-                                            </Box>
-                                        );
-                                    })
+                                                {formatCurrency(data?.deposit)}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight={600}
+                                                color="success.main"
+                                                textAlign="right"
+                                            >
+                                                {formatCurrency(data?.interest)}
+                                            </Typography>
+                                        </Box>
+                                    );
+                                })
                                 )}
                             </Box>
                         </Box>

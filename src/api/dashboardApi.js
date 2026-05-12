@@ -6,3 +6,24 @@ export const getKpiData = async (month, year) => {
     });
     return response.data;
 };
+
+export const getMonthlyTrend = async (month, year) => {
+    const response = await axiosInstance.get('/api/dashboard/trend', {
+        params: { month, year }
+    });
+    return response.data;
+};
+
+export const getIncomePieData = async (month, year) => {
+    const response = await axiosInstance.get('/api/dashboard/income-pie', {
+        params: { month, year }
+    });
+    return response.data;
+};
+
+export const getExpensePieData = async (month, year) => {
+    const response = await axiosInstance.get('/api/dashboard/expense-pie', {
+        params: { month, year }
+    });
+    return response.data;
+};
