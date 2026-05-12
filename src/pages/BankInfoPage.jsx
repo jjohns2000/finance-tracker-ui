@@ -34,6 +34,12 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import {
+    getUserCreditCards,
+    createCreditCard,
+    updateCreditCard,
+    deleteCreditCard
+} from '../api/creditCardApi';
 
 const emptyForm = {
     bankId: '',
@@ -55,20 +61,33 @@ const BankInfoPage = () => {
     const [form, setForm] = useState(emptyForm);
     const [saving, setSaving] = useState(false);
 
+    const [creditCards, setCreditCards] = useState([]);
+    const [creditCardDialogOpen, setCreditCardDialogOpen] = useState(false);
+    const [creditCardDeleteDialogOpen, setCreditCardDeleteDialogOpen] = useState(false);
+    const [selectedCreditCard, setSelectedCreditCard] = useState(null);
+    const [creditCardForm, setCreditCardForm] = useState({
+        cardName: '',
+        creditLimit: '',
+        startDate: ''
+    });
+    const [savingCreditCard, setSavingCreditCard] = useState(false);
+
     const fetchAll = async () => {
         try {
-            const [nav, accs, bnks, types, totals] = await Promise.all([
+            const [nav, accs, bnks, types, totals, cards] = await Promise.all([
                 getNavItems(),
                 getUserAccounts(),
                 getBanks(),
                 getAccountTypes(),
-                getAccountRunningTotals()
+                getAccountRunningTotals(),
+                getUserCreditCards()
             ]);
             setNavItems(nav);
             setAccounts(accs);
             setBanks(bnks);
             setAccountTypes(types);
             setRunningTotals(totals);
+            setCreditCards(cards);
         } catch (err) {
             console.error('Failed to load bank info', err);
         } finally {
@@ -84,6 +103,68 @@ const BankInfoPage = () => {
         setSelectedAccount(null);
         setForm(emptyForm);
         setDialogOpen(true);
+    };
+
+    const handleOpenAddCreditCard = () => {
+    setSelectedCreditCard(null);
+    setCreditCardForm({ cardName: '', creditLimit: '', startDate: '' });
+    setCreditCardDialogOpen(true);
+};
+
+    const handleOpenEditCreditCard = (card) => {
+        setSelectedCreditCard(card);
+        setCreditCardForm({
+            cardName: card.cardName,
+            creditLimit: card.creditLimit,
+            startDate: card.startDate
+                ? new Date(card.startDate).toISOString().split('T')[0]
+                : ''
+        });
+        setCreditCardDialogOpen(true);
+    };
+
+    const handleOpenDeleteCreditCard = (card) => {
+        setSelectedCreditCard(card);
+        setCreditCardDeleteDialogOpen(true);
+    };
+
+    const handleSaveCreditCard = async () => {
+        setSavingCreditCard(true);
+        try {
+            if (selectedCreditCard) {
+                await updateCreditCard({
+                    publicId: selectedCreditCard.publicId,
+                    cardName: creditCardForm.cardName,
+                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
+                    startDate: creditCardForm.startDate
+                });
+                showSnackbar('Credit card updated successfully.', 'success');
+            } else {
+                await createCreditCard({
+                    cardName: creditCardForm.cardName,
+                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
+                    startDate: creditCardForm.startDate
+                });
+                showSnackbar('Credit card added successfully.', 'success');
+            }
+            await fetchAll();
+            setCreditCardDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Something went wrong. Please try again.', 'error');
+        } finally {
+            setSavingCreditCard(false);
+        }
+    };
+
+    const handleDeleteCreditCard = async () => {
+        try {
+            await deleteCreditCard(selectedCreditCard.publicId);
+            showSnackbar('Credit card removed successfully.', 'info');
+            await fetchAll();
+            setCreditCardDeleteDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Failed to remove credit card.', 'error');
+        }
     };
 
     const handleOpenEdit = (account) => {
@@ -254,7 +335,123 @@ const BankInfoPage = () => {
                 )}
             </PageCard>
 
-            {/* Section 2 — Running Totals */}
+            {/* Section 2 — Credit Cards */}
+            <PageCard>
+                <SectionHeader
+                    title="Credit cards"
+                    subtitle="Your linked credit cards"
+                    action={
+                        <Button
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            size="small"
+                            onClick={handleOpenAddCreditCard}
+                            sx={{ borderRadius: 2, textTransform: 'none' }}
+                        >
+                            Add card
+                        </Button>
+                    }
+                />
+
+                {loading ? (
+                    <Box display="flex" justifyContent="center" py={4}>
+                        <CircularProgress size={24} />
+                    </Box>
+                ) : creditCards.length === 0 ? (
+                    <Box display="flex" alignItems="center" justifyContent="center" py={4}>
+                        <Typography variant="body2" color="text.secondary">
+                            No credit cards added yet. Click Add card to get started.
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Box
+                        sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            maxHeight: 260,
+                            overflowY: 'auto'
+                        }}
+                    >
+                        {/* Header */}
+                        <Box
+                            sx={{
+                                display: 'grid',
+                                gridTemplateColumns: '2fr 1fr 1fr 80px',
+                                px: 2,
+                                py: 1.5,
+                                bgcolor: 'background.default',
+                                borderBottom: '1px solid',
+                                borderColor: 'divider'
+                            }}
+                        >
+                            {['Card name', 'Limit', 'Since', ''].map((col, i) => (
+                                <Typography
+                                    key={i}
+                                    variant="caption"
+                                    color="text.secondary"
+                                    fontWeight={600}
+                                >
+                                    {col}
+                                </Typography>
+                            ))}
+                        </Box>
+
+                        {/* Rows */}
+                        {creditCards.map((card, index) => (
+                            <Box
+                                key={card.publicId}
+                                sx={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '2fr 1fr 1fr 80px',
+                                    px: 2,
+                                    py: 1.5,
+                                    alignItems: 'center',
+                                    borderBottom: index < creditCards.length - 1
+                                        ? '1px solid' : 'none',
+                                    borderColor: 'divider',
+                                    '&:hover': { bgcolor: 'background.default' }
+                                }}
+                            >
+                                <Typography variant="body2" fontWeight={600}>
+                                    {card.cardName}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {formatCurrency(card.creditLimit)}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {new Date(card.startDate).toLocaleDateString('en-CA', {
+                                        year: 'numeric',
+                                        month: 'short'
+                                    })}
+                                </Typography>
+                                <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                                    <Tooltip title="Edit">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleOpenEditCreditCard(card)}
+                                        >
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Delete">
+                                        <IconButton
+                                            size="small"
+                                            color="error"
+                                            onClick={() => handleOpenDeleteCreditCard(card)}
+                                        >
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+            </PageCard>
+
+            {/* Section 3 — Running Totals */}
             <PageCard>
                 <SectionHeader
                     title="Running totals"
@@ -505,6 +702,105 @@ const BankInfoPage = () => {
                     </Button>
                     <Button
                         onClick={handleDelete}
+                        variant="contained"
+                        color="error"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Remove
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Credit Card Add/Edit Dialog */}
+            <Dialog
+                open={creditCardDialogOpen}
+                onClose={() => setCreditCardDialogOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {selectedCreditCard ? 'Edit credit card' : 'Add credit card'}
+                </DialogTitle>
+                <DialogContent>
+                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                        <TextField
+                            label="Card name"
+                            value={creditCardForm.cardName}
+                            onChange={(e) => setCreditCardForm({ ...creditCardForm, cardName: e.target.value })}
+                            fullWidth
+                            required
+                        />
+                        <TextField
+                            label="Credit limit"
+                            type="number"
+                            value={creditCardForm.creditLimit}
+                            onChange={(e) => setCreditCardForm({ ...creditCardForm, creditLimit: e.target.value })}
+                            fullWidth
+                            required
+                            inputProps={{ min: 0, step: '0.01' }}
+                        />
+                        <TextField
+                            label="Start date"
+                            type="date"
+                            value={creditCardForm.startDate}
+                            onChange={(e) => setCreditCardForm({ ...creditCardForm, startDate: e.target.value })}
+                            fullWidth
+                            required
+                            InputLabelProps={{ shrink: true }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setCreditCardDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveCreditCard}
+                        variant="contained"
+                        disabled={
+                            savingCreditCard ||
+                            !creditCardForm.cardName ||
+                            !creditCardForm.creditLimit ||
+                            !creditCardForm.startDate
+                        }
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        {savingCreditCard
+                            ? <CircularProgress size={20} color="inherit" />
+                            : selectedCreditCard ? 'Save changes' : 'Add card'
+                        }
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Credit Card Delete Dialog */}
+            <Dialog
+                open={creditCardDeleteDialogOpen}
+                onClose={() => setCreditCardDeleteDialogOpen(false)}
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>Remove credit card</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary">
+                        Are you sure you want to remove{' '}
+                        <strong>{selectedCreditCard?.cardName}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setCreditCardDeleteDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteCreditCard}
                         variant="contained"
                         color="error"
                         sx={{ borderRadius: 2, textTransform: 'none' }}

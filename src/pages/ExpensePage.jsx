@@ -6,6 +6,12 @@ import {
     getMonthlyAggregate,
     upsertWithdrawal
 } from '../api/expenseApi';
+import {
+    getActiveExpenseTypes,
+    getMonthlyExpenseEntries,
+    upsertMonthlyExpenseEntry,
+    deleteMonthlyExpenseEntry
+} from '../api/expenseTypeApi';
 import { useSnackbar } from '../context/SnackbarContext';
 import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
@@ -26,8 +32,15 @@ import {
     Divider
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import CountUp from '../components/CountUp';
+import {
+    getUserCreditCards,
+    getMonthlyCreditCardSummary,
+    upsertMonthlyCreditCardSummary
+} from '../api/creditCardApi';
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -49,6 +62,7 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
 const ExpensePage = () => {
     const { showSnackbar } = useSnackbar();
+
     const [navItems, setNavItems] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [summary, setSummary] = useState([]);
@@ -56,10 +70,34 @@ const ExpensePage = () => {
     const [month, setMonth] = useState(new Date().getMonth() + 1);
     const [year, setYear] = useState(currentYear);
     const [loading, setLoading] = useState(true);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [selectedAccount, setSelectedAccount] = useState(null);
     const [form, setForm] = useState({ withdrawal: '' });
     const [saving, setSaving] = useState(false);
+
+    const [expenseTypes, setExpenseTypes] = useState([]);
+    const [expenseEntries, setExpenseEntries] = useState([]);
+    const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+    const [selectedExpenseType, setSelectedExpenseType] = useState(null);
+    const [selectedEntry, setSelectedEntry] = useState(null);
+    const [expenseEntryDeleteDialogOpen, setExpenseEntryDeleteDialogOpen] = useState(false);
+    const [expenseForm, setExpenseForm] = useState({ actualAmount: '' });
+    const [savingExpense, setSavingExpense] = useState(false);
+
+    const [recurringSearch, setRecurringSearch] = useState('');
+    const [oneTimeSearch, setOneTimeSearch] = useState('');
+
+    const [creditCards, setCreditCards] = useState([]);
+    const [monthlyCreditCards, setMonthlyCreditCards] = useState([]);
+    const [creditCardDialogOpen, setCreditCardDialogOpen] = useState(false);
+    const [selectedCreditCard, setSelectedCreditCard] = useState(null);
+    const [selectedCreditCardEntry, setSelectedCreditCardEntry] = useState(null);
+    const [creditCardForm, setCreditCardForm] = useState({
+        billAmount: '',
+        amountPaid: ''
+    });
+    const [savingCreditCard, setSavingCreditCard] = useState(false);
 
     const fetchExpenseData = async () => {
         setLoading(true);
@@ -77,15 +115,43 @@ const ExpensePage = () => {
         }
     };
 
+    const fetchCreditCardData = async () => {
+        try {
+            const [cards, monthly] = await Promise.all([
+                getUserCreditCards(),
+                getMonthlyCreditCardSummary(month, year)
+            ]);
+            setCreditCards(cards);
+            setMonthlyCreditCards(monthly);
+        } catch (err) {
+            console.error('Failed to load credit card data', err);
+        }
+    };
+
+    const fetchExpenseTypeData = async () => {
+        try {
+            const [types, entries] = await Promise.all([
+                getActiveExpenseTypes(month, year),
+                getMonthlyExpenseEntries(month, year)
+            ]);
+            setExpenseTypes(types);
+            setExpenseEntries(entries);
+        } catch (err) {
+            console.error('Failed to load expense type data', err);
+        }
+    };
+
     useEffect(() => {
         const init = async () => {
             try {
-                const [nav, accs] = await Promise.all([
+                const [nav, accs, cards] = await Promise.all([
                     getNavItems(),
-                    getUserAccounts()
+                    getUserAccounts(),
+                    getUserCreditCards()
                 ]);
                 setNavItems(nav);
                 setAccounts(accs);
+                setCreditCards(cards);
             } catch (err) {
                 console.error('Failed to initialize', err);
             }
@@ -95,6 +161,8 @@ const ExpensePage = () => {
 
     useEffect(() => {
         fetchExpenseData();
+        fetchExpenseTypeData();
+        fetchCreditCardData();
     }, [month, year]);
 
     const getSummaryForAccount = (account) =>
@@ -129,12 +197,80 @@ const ExpensePage = () => {
         }
     };
 
+    const getEntryForType = (typeId) =>
+        expenseEntries.find(e => e.expenseTypeId === typeId) || null;
+
+    const handleOpenExpenseEntry = (type) => {
+        const existing = getEntryForType(type.id);
+        setSelectedExpenseType(type);
+        setSelectedEntry(existing || null);
+        setExpenseForm({ actualAmount: existing?.actualAmount ?? type.amount ?? '' });
+        setExpenseDialogOpen(true);
+    };
+
+    const handleOpenDeleteExpenseEntry = (entry) => {
+        setSelectedEntry(entry);
+        setExpenseEntryDeleteDialogOpen(true);
+    };
+
+    const handleSaveExpenseEntry = async () => {
+        setSavingExpense(true);
+        try {
+            await upsertMonthlyExpenseEntry({
+                publicId: selectedEntry?.publicId || null,
+                expenseTypeId: selectedExpenseType.id,
+                month,
+                year,
+                actualAmount: parseFloat(expenseForm.actualAmount) || 0
+            });
+            showSnackbar('Expense entry saved successfully.', 'success');
+            setExpenseDialogOpen(false);
+            await fetchExpenseTypeData();
+        } catch (err) {
+            showSnackbar('Failed to save expense entry.', 'error');
+        } finally {
+            setSavingExpense(false);
+        }
+    };
+
+    const handleDeleteExpenseEntry = async () => {
+        try {
+            await deleteMonthlyExpenseEntry(selectedEntry.publicId);
+            showSnackbar('Expense entry removed successfully.', 'info');
+            await fetchExpenseTypeData();
+            setExpenseEntryDeleteDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Failed to remove expense entry.', 'error');
+        }
+    };
+
     const formatCurrency = (value) =>
         `$${(value ?? 0).toLocaleString('en-CA', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         })}`;
 
+    // Sort by actual amount if entry exists, else default amount, descending
+    const sortByAmount = (types) =>
+        [...types].sort((a, b) => {
+            const aEntry = getEntryForType(a.id);
+            const bEntry = getEntryForType(b.id);
+            const aAmount = aEntry ? aEntry.actualAmount : (a.amount ?? 0);
+            const bAmount = bEntry ? bEntry.actualAmount : (b.amount ?? 0);
+            return bAmount - aAmount;
+        });
+
+    const recurringTypes = sortByAmount(
+        expenseTypes
+            .filter(t => t.isRecurring)
+            .filter(t => t.expenseName.toLowerCase().includes(recurringSearch.toLowerCase()))
+    );
+
+    const oneTimeTypes = sortByAmount(
+        expenseTypes
+            .filter(t => !t.isRecurring)
+            .filter(t => t.expenseName.toLowerCase().includes(oneTimeSearch.toLowerCase()))
+    );
     const TrendValue = ({ value }) => {
         const positive = (value ?? 0) >= 0;
         return (
@@ -148,13 +284,52 @@ const ExpensePage = () => {
                     fontWeight={600}
                     color={positive ? 'success.main' : 'error.main'}
                 >
-                    {formatCurrency(value)}
+                    <CountUp value={Math.abs(value ?? 0)} prefix="$" duration={1200} />
                 </Typography>
             </Box>
         );
     };
 
-    const MetricBox = ({ label, value, color }) => (
+    const getCreditCardEntry = (cardId) =>
+    monthlyCreditCards.find(m => m.creditCardId === cardId) || null;
+
+    const handleOpenCreditCardEntry = (card) => {
+        const existing = getCreditCardEntry(card.id);
+        setSelectedCreditCard(card);
+        setSelectedCreditCardEntry(existing || null);
+        setCreditCardForm({
+            billAmount: existing?.billAmount ?? '',
+            amountPaid: existing?.amountPaid ?? ''
+        });
+        setCreditCardDialogOpen(true);
+    };
+
+    const handleSaveCreditCardEntry = async () => {
+        setSavingCreditCard(true);
+        try {
+            await upsertMonthlyCreditCardSummary({
+                creditCardId: selectedCreditCard.id,
+                month,
+                year,
+                billAmount: parseFloat(creditCardForm.billAmount) || 0,
+                amountPaid: parseFloat(creditCardForm.amountPaid) || 0
+            });
+            showSnackbar('Credit card entry saved successfully.', 'success');
+            setCreditCardDialogOpen(false);
+
+            // Refresh both credit card and expense type data together
+            await Promise.all([
+                fetchCreditCardData(),
+                fetchExpenseTypeData()
+            ]);
+        } catch (err) {
+            showSnackbar('Failed to save credit card entry.', 'error');
+        } finally {
+            setSavingCreditCard(false);
+        }
+    };
+
+    const MetricBox = ({ label, rawValue, color }) => (
         <Box
             sx={{
                 p: 2,
@@ -173,8 +348,34 @@ const ExpensePage = () => {
                 mt={0.5}
                 color={color || 'text.primary'}
             >
-                {value}
+                <CountUp value={rawValue ?? 0} prefix="$" duration={1200} />
             </Typography>
+        </Box>
+    );
+
+    const ListHeader = ({ columns, gridTemplateColumns }) => (
+        <Box
+            sx={{
+                display: 'grid',
+                gridTemplateColumns,
+                px: 2,
+                py: 1.5,
+                bgcolor: 'background.default',
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+            }}
+        >
+            {columns.map((col, i) => (
+                <Typography
+                    key={i}
+                    variant="caption"
+                    color="text.secondary"
+                    fontWeight={600}
+                    textAlign="left"
+                >
+                    {col}
+                </Typography>
+            ))}
         </Box>
     );
 
@@ -262,16 +463,16 @@ const ExpensePage = () => {
                             >
                                 <MetricBox
                                     label="Opening balance"
-                                    value={formatCurrency(aggregate?.totalOpeningBalance)}
+                                    rawValue={aggregate?.totalOpeningBalance}
                                 />
                                 <MetricBox
                                     label="Total withdrawal"
-                                    value={formatCurrency(aggregate?.totalWithdrawal)}
+                                    rawValue={aggregate?.totalWithdrawal}
                                     color="error.main"
                                 />
                                 <MetricBox
                                     label="Closing balance"
-                                    value={formatCurrency(aggregate?.totalClosingBalance)}
+                                    rawValue={aggregate?.totalClosingBalance}
                                 />
                                 <Box
                                     sx={{
@@ -297,11 +498,9 @@ const ExpensePage = () => {
                             flexItem
                             sx={{ display: { xs: 'none', md: 'block' } }}
                         />
-                        <Divider
-                            sx={{ display: { xs: 'block', md: 'none' } }}
-                        />
+                        <Divider sx={{ display: { xs: 'block', md: 'none' } }} />
 
-                        {/* Right — Contributing Accounts List */}
+                        {/* Right — Contributing Accounts */}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography
                                 variant="body2"
@@ -321,32 +520,10 @@ const ExpensePage = () => {
                                     overflowY: 'auto'
                                 }}
                             >
-                                {/* Header */}
-                                <Box
-                                    sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '2fr 1fr 1fr',
-                                        px: 2,
-                                        py: 1,
-                                        bgcolor: 'background.default',
-                                        borderBottom: '1px solid',
-                                        borderColor: 'divider'
-                                    }}
-                                >
-                                    {['Bank', 'Type', 'Withdrawal'].map((col, i) => (
-                                        <Typography
-                                            key={i}
-                                            variant="caption"
-                                            color="text.secondary"
-                                            fontWeight={600}
-                                            textAlign={i === 2 ? 'right' : 'left'}
-                                        >
-                                            {col}
-                                        </Typography>
-                                    ))}
-                                </Box>
-
-                                {/* Rows */}
+                                <ListHeader
+                                    columns={['Bank', 'Type', 'Withdrawal']}
+                                    gridTemplateColumns="2fr 1fr 1fr"
+                                />
                                 {accounts.length === 0 ? (
                                     <Box px={2} py={3}>
                                         <Typography variant="body2" color="text.secondary">
@@ -359,17 +536,19 @@ const ExpensePage = () => {
                                         return (
                                             <Box
                                                 key={account.publicId}
+                                                onClick={() => handleOpenEdit(account)}
                                                 sx={{
                                                     display: 'grid',
                                                     gridTemplateColumns: '2fr 1fr 1fr',
                                                     px: 2,
                                                     py: 1.5,
+                                                    alignItems: 'center',
+                                                    cursor: 'pointer',
                                                     borderBottom: index < accounts.length - 1
-                                                        ? '1px solid'
-                                                        : 'none',
+                                                        ? '1px solid' : 'none',
                                                     borderColor: 'divider',
                                                     '&:hover': {
-                                                        bgcolor: 'background.default'
+                                                        bgcolor: 'action.hover'
                                                     }
                                                 }}
                                             >
@@ -383,7 +562,6 @@ const ExpensePage = () => {
                                                     variant="body2"
                                                     fontWeight={600}
                                                     color="error.main"
-                                                    textAlign="right"
                                                 >
                                                     {formatCurrency(data?.withdrawal)}
                                                 </Typography>
@@ -397,9 +575,343 @@ const ExpensePage = () => {
                 )}
             </PageCard>
 
-            
+            {/* Section 3 — Expense Types */}
+            <PageCard>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
+                    Expense types — {MONTHS.find(m => m.value === month)?.label} {year}
+                </Typography>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        gap: 3
+                    }}
+                >
+                    {/* Left — Recurring */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">
+                            Recurring
+                        </Typography>
+                        {/* Search */}
+                        <TextField
+                            placeholder="Search recurring..."
+                            size="small"
+                            fullWidth
+                            value={recurringSearch}
+                            onChange={(e) => setRecurringSearch(e.target.value)}
+                            sx={{ mb: 1 }}
+                            inputProps={{ style: { fontSize: 13 } }}
+                        />
+                        <Box
+                            sx={{
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <ListHeader
+                                columns={['Expense', 'Default', 'Actual', '']}
+                                gridTemplateColumns="2fr 1fr 1fr 60px"
+                            />
+                            <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
+                                {recurringTypes.length === 0 ? (
+                                    <Box px={2} py={3}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No active recurring expenses.
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    recurringTypes.map((type, index, arr) => {
+                                        const entry = getEntryForType(type.id);
+                                        return (
+                                            <Box
+                                                key={type.publicId}
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '2fr 1fr 1fr 60px',
+                                                    px: 2,
+                                                    py: 1.5,
+                                                    alignItems: 'center',
+                                                    borderBottom: index < arr.length - 1
+                                                        ? '1px solid' : 'none',
+                                                    borderColor: 'divider',
+                                                    '&:hover': { bgcolor: 'background.default' }
+                                                }}
+                                            >
+                                                <Typography variant="body2" fontWeight={600}>
+                                                    {type.expenseName}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {formatCurrency(type.amount)}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    fontWeight={600}
+                                                    color={entry ? 'error.main' : 'text.secondary'}
+                                                >
+                                                    {entry ? formatCurrency(entry.actualAmount) : '—'}
+                                                </Typography>
+                                                <Box display="flex" justifyContent="flex-start" gap={0.5}>
+                                                    {!type.isSystemManaged && (
+                                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleOpenExpenseEntry(type)}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                    {!type.isSystemManaged && entry && (
+                                                        <Tooltip title="Delete entry">
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleOpenDeleteExpenseEntry(entry)}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                    {type.isSystemManaged && (
+                                                        <Tooltip title="Auto-updated from credit card entries">
+                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                                                                Auto
+                                                            </Typography>
+                                                        </Tooltip>
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })
+                                )}
+                            </Box>
+                        </Box>
+                    </Box>
 
-            {/* Edit Dialog */}
+                    <Divider
+                        orientation="vertical"
+                        flexItem
+                        sx={{ display: { xs: 'none', md: 'block' } }}
+                    />
+                    <Divider sx={{ display: { xs: 'block', md: 'none' } }} />
+
+                    {/* Right — One-time */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">
+                            One-time
+                        </Typography>
+                        {/* Search */}
+                        <TextField
+                            placeholder="Search one-time..."
+                            size="small"
+                            fullWidth
+                            value={oneTimeSearch}
+                            onChange={(e) => setOneTimeSearch(e.target.value)}
+                            sx={{ mb: 1 }}
+                            inputProps={{ style: { fontSize: 13 } }}
+                        />
+                        <Box
+                            sx={{
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                                overflow: 'hidden'
+                            }}
+                        >
+                            <ListHeader
+                                columns={['Expense', 'Amount', '']}
+                                gridTemplateColumns="2fr 1fr 60px"
+                            />
+                            <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
+                                {oneTimeTypes.length === 0 ? (
+                                    <Box px={2} py={3}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            No one-time expense types. Add them in Settings.
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    oneTimeTypes.map((type, index, arr) => {
+                                        const entry = getEntryForType(type.id);
+                                        return (
+                                            <Box
+                                                key={type.publicId}
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '2fr 1fr 60px',
+                                                    px: 2,
+                                                    py: 1.5,
+                                                    alignItems: 'center',
+                                                    borderBottom: index < arr.length - 1
+                                                        ? '1px solid' : 'none',
+                                                    borderColor: 'divider',
+                                                    '&:hover': { bgcolor: 'background.default' }
+                                                }}
+                                            >
+                                                <Typography variant="body2" fontWeight={600}>
+                                                    {type.expenseName}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    fontWeight={600}
+                                                    color={entry ? 'error.main' : 'text.secondary'}
+                                                    sx={type.isSystemManaged ? { fontStyle: 'italic' } : {}}
+                                                >
+                                                    {entry ? formatCurrency(entry.actualAmount) : '—'}
+                                                </Typography>
+                                                <Box display="flex" justifyContent="flex-start" gap={0.5}>
+                                                    {!type.isSystemManaged && (
+                                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleOpenExpenseEntry(type)}
+                                                            >
+                                                                <EditIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                    {!type.isSystemManaged && entry && (
+                                                        <Tooltip title="Delete entry">
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleOpenDeleteExpenseEntry(entry)}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    )}
+                                                    {type.isSystemManaged && (
+                                                        <Tooltip title="Auto-updated from credit card entries">
+                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
+                                                                Auto
+                                                            </Typography>
+                                                        </Tooltip>
+                                                    )}
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })
+                                )}
+                            </Box>
+                        </Box>
+                    </Box>
+                </Box>
+            </PageCard>
+            
+            {/* Section 4 — Credit Cards */}
+            <PageCard>
+                <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
+                    Credit cards — {MONTHS.find(m => m.value === month)?.label} {year}
+                </Typography>
+                <Box
+                    sx={{
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Header */}
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 40px',
+                            px: 2,
+                            py: 1.5,
+                            bgcolor: 'background.default',
+                            borderBottom: '1px solid',
+                            borderColor: 'divider'
+                        }}
+                    >
+                        {['Card', 'Limit', 'Bill', 'Paid', 'Balance', ''].map((col, i) => (
+                            <Typography
+                                key={i}
+                                variant="caption"
+                                color="text.secondary"
+                                fontWeight={600}
+                            >
+                                {col}
+                            </Typography>
+                        ))}
+                    </Box>
+
+                    {/* Rows */}
+                    {creditCards.length === 0 ? (
+                        <Box px={2} py={3}>
+                            <Typography variant="body2" color="text.secondary">
+                                No credit cards found. Add them in Bank Info.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        creditCards.map((card, index) => {
+                            const entry = getCreditCardEntry(card.id);
+                            return (
+                                <Box
+                                    key={card.publicId}
+                                    onClick={() => handleOpenCreditCardEntry(card)}
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 40px',
+                                        px: 2,
+                                        py: 1.5,
+                                        alignItems: 'center',
+                                        cursor: 'pointer',
+                                        borderBottom: index < creditCards.length - 1
+                                            ? '1px solid' : 'none',
+                                        borderColor: 'divider',
+                                        '&:hover': { bgcolor: 'action.hover' }
+                                    }}
+                                >
+                                    <Typography variant="body2" fontWeight={600}>
+                                        {card.cardName}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {formatCurrency(card.creditLimit)}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                        color={entry ? 'error.main' : 'text.secondary'}
+                                    >
+                                        {entry ? formatCurrency(entry.billAmount) : '—'}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                        color={entry ? 'success.main' : 'text.secondary'}
+                                    >
+                                        {entry ? formatCurrency(entry.amountPaid) : '—'}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                        color={entry?.balance > 0 ? 'error.main' : 'text.secondary'}
+                                    >
+                                        {entry ? formatCurrency(entry.balance) : '—'}
+                                    </Typography>
+                                    <Box display="flex" justifyContent="flex-end">
+                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenCreditCardEntry(card);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </Box>
+                            );
+                        })
+                    )}
+                </Box>
+            </PageCard>
+
+            {/* ─── Withdrawal Edit Dialog ──────────────────────── */}
             <Dialog
                 open={dialogOpen}
                 onClose={() => setDialogOpen(false)}
@@ -442,6 +954,145 @@ const ExpensePage = () => {
                         {saving
                             ? <CircularProgress size={20} color="inherit" />
                             : 'Save'
+                        }
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ─── Expense Entry Add/Edit Dialog ──────────────── */}
+            <Dialog
+                open={expenseDialogOpen}
+                onClose={() => setExpenseDialogOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {selectedEntry ? 'Edit expense entry' : 'Add expense entry'}
+                </DialogTitle>
+                <DialogContent>
+                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
+                        <Typography variant="body2" color="text.secondary">
+                            {selectedExpenseType?.expenseName} — {MONTHS.find(m => m.value === month)?.label} {year}
+                        </Typography>
+                        <TextField
+                            label="Amount"
+                            type="number"
+                            value={expenseForm.actualAmount}
+                            onChange={(e) => setExpenseForm({ actualAmount: e.target.value })}
+                            fullWidth
+                            required
+                            inputProps={{ min: 0, step: '0.01' }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setExpenseDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveExpenseEntry}
+                        variant="contained"
+                        disabled={savingExpense || expenseForm.actualAmount === ''}
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        {savingExpense
+                            ? <CircularProgress size={20} color="inherit" />
+                            : selectedEntry ? 'Save changes' : 'Add'
+                        }
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ─── Expense Entry Delete Dialog ─────────────────── */}
+            <Dialog
+                open={expenseEntryDeleteDialogOpen}
+                onClose={() => setExpenseEntryDeleteDialogOpen(false)}
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>Remove expense entry</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary">
+                        Are you sure you want to remove this entry for{' '}
+                        <strong>{selectedEntry?.expenseName}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setExpenseEntryDeleteDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteExpenseEntry}
+                        variant="contained"
+                        color="error"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Remove
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Credit Card Entry Dialog */}
+            <Dialog
+                open={creditCardDialogOpen}
+                onClose={() => setCreditCardDialogOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {selectedCreditCardEntry ? 'Edit credit card entry' : 'Add credit card entry'}
+                </DialogTitle>
+                <DialogContent>
+                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
+                        <Typography variant="body2" color="text.secondary">
+                            {selectedCreditCard?.cardName} — {MONTHS.find(m => m.value === month)?.label} {year}
+                        </Typography>
+                        <TextField
+                            label="Bill amount"
+                            type="number"
+                            value={creditCardForm.billAmount}
+                            onChange={(e) => setCreditCardForm({ ...creditCardForm, billAmount: e.target.value })}
+                            fullWidth
+                            required
+                            inputProps={{ min: 0, step: '0.01' }}
+                        />
+                        <TextField
+                            label="Amount paid"
+                            type="number"
+                            value={creditCardForm.amountPaid}
+                            onChange={(e) => setCreditCardForm({ ...creditCardForm, amountPaid: e.target.value })}
+                            fullWidth
+                            inputProps={{ min: 0, step: '0.01' }}
+                            helperText="Leave as 0 if not yet paid"
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setCreditCardDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveCreditCardEntry}
+                        variant="contained"
+                        disabled={savingCreditCard || creditCardForm.billAmount === ''}
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        {savingCreditCard
+                            ? <CircularProgress size={20} color="inherit" />
+                            : selectedCreditCardEntry ? 'Save changes' : 'Add'
                         }
                     </Button>
                 </DialogActions>
