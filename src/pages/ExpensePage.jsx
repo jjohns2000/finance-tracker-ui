@@ -15,7 +15,7 @@ import {
 import { useSnackbar } from '../context/SnackbarContext';
 import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
-import PageCard from '../components/PageCard';
+import PageCard, { hideScrollbar } from '../components/PageCard';
 import {
     Box,
     Typography,
@@ -41,6 +41,14 @@ import {
     getMonthlyCreditCardSummary,
     upsertMonthlyCreditCardSummary
 } from '../api/creditCardApi';
+import {
+    getPaymentMethods,
+    getTransactions,
+    createTransaction,
+    updateTransaction,
+    deleteTransaction
+} from '../api/transactionApi';
+import AddIcon from '@mui/icons-material/Add';
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -99,6 +107,30 @@ const ExpensePage = () => {
     });
     const [savingCreditCard, setSavingCreditCard] = useState(false);
 
+    const [transactions, setTransactions] = useState([]);
+    const [paymentMethods, setPaymentMethods] = useState([]);
+    const [transactionSearch, setTransactionSearch] = useState('');
+    const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
+    const [transactionDeleteDialogOpen, setTransactionDeleteDialogOpen] = useState(false);
+    const [selectedTransaction, setSelectedTransaction] = useState(null);
+    const [savingTransaction, setSavingTransaction] = useState(false);
+    const [transactionForm, setTransactionForm] = useState({
+        expenseTypeId: '',
+        paymentMethodId: '',
+        amount: '',
+        description: '',
+        transactionDate: ''
+    });
+
+    const fetchTransactions = async () => {
+        try {
+            const data = await getTransactions(month, year);
+            setTransactions(data);
+        } catch (err) {
+            console.error('Failed to load transactions', err);
+        }
+    };
+
     const fetchExpenseData = async () => {
         setLoading(true);
         try {
@@ -144,14 +176,17 @@ const ExpensePage = () => {
     useEffect(() => {
         const init = async () => {
             try {
-                const [nav, accs, cards] = await Promise.all([
+                const [nav, accs, cards, methods] = await Promise.all([
                     getNavItems(),
                     getUserAccounts(),
-                    getUserCreditCards()
+                    getUserCreditCards(),
+                    getPaymentMethods()
                 ]);
                 setNavItems(nav);
                 setAccounts(accs);
                 setCreditCards(cards);
+                setPaymentMethods(methods);
+                console.log('Payment methods:', methods);
             } catch (err) {
                 console.error('Failed to initialize', err);
             }
@@ -163,6 +198,7 @@ const ExpensePage = () => {
         fetchExpenseData();
         fetchExpenseTypeData();
         fetchCreditCardData();
+        fetchTransactions();
     }, [month, year]);
 
     const getSummaryForAccount = (account) =>
@@ -377,6 +413,91 @@ const ExpensePage = () => {
                 </Typography>
             ))}
         </Box>
+    );
+
+    const handleOpenAddTransaction = () => {
+        setSelectedTransaction(null);
+        setTransactionForm({
+            expenseTypeId: '',
+            paymentMethodId: '',
+            amount: '',
+            description: '',
+            transactionDate: new Date().toISOString().split('T')[0]
+        });
+        setTransactionDialogOpen(true);
+    };
+    const handleOpenEditTransaction = (transaction) => {
+    setSelectedTransaction(transaction);
+    const expenseType = expenseTypes.find(
+        t => t.expenseName === transaction.expenseName
+    );
+    const paymentMethod = paymentMethods.find(
+            m => m.methodName === transaction.paymentMethod
+        );
+        setTransactionForm({
+            expenseTypeId: expenseType?.id || '',
+            paymentMethodId: paymentMethod?.id || '',
+            amount: transaction.amount,
+            description: transaction.description || '',
+            transactionDate: new Date(transaction.transactionDate)
+                .toISOString().split('T')[0]
+        });
+        setTransactionDialogOpen(true);
+    };
+    const handleOpenDeleteTransaction = (transaction) => {
+        setSelectedTransaction(transaction);
+        setTransactionDeleteDialogOpen(true);
+    };
+    const handleSaveTransaction = async () => {
+        setSavingTransaction(true);
+        try {
+            if (selectedTransaction) {
+                await updateTransaction({
+                    publicId: selectedTransaction.publicId,
+                    expenseTypeId: parseInt(transactionForm.expenseTypeId),
+                    paymentMethodId: parseInt(transactionForm.paymentMethodId),
+                    amount: parseFloat(transactionForm.amount) || 0,
+                    description: transactionForm.description || null,
+                    transactionDate: transactionForm.transactionDate,
+                    accountId: null,
+                    creditCardId: null
+                });
+                showSnackbar('Transaction updated successfully.', 'success');
+            } else {
+                await createTransaction({
+                    expenseTypeId: parseInt(transactionForm.expenseTypeId),
+                    paymentMethodId: parseInt(transactionForm.paymentMethodId),
+                    amount: parseFloat(transactionForm.amount) || 0,
+                    description: transactionForm.description || null,
+                    transactionDate: transactionForm.transactionDate,
+                    accountId: null,
+                    creditCardId: null
+                });
+                showSnackbar('Transaction added successfully.', 'success');
+            }
+            setTransactionDialogOpen(false);
+            await fetchTransactions();
+        } catch (err) {
+            showSnackbar('Failed to save transaction.', 'error');
+        } finally {
+            setSavingTransaction(false);
+        }
+    };
+    const handleDeleteTransaction = async () => {
+        try {
+            await deleteTransaction(selectedTransaction.publicId);
+            showSnackbar('Transaction removed successfully.', 'info');
+            await fetchTransactions();
+            setTransactionDeleteDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Failed to remove transaction.', 'error');
+        }
+    };
+
+    const filteredTransactions = transactions.filter(t =>
+        t.expenseName.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+        t.paymentMethod.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+        (t.description && t.description.toLowerCase().includes(transactionSearch.toLowerCase()))
     );
 
     return (
@@ -910,6 +1031,304 @@ const ExpensePage = () => {
                     )}
                 </Box>
             </PageCard>
+
+            {/* Section 5 — Transactions */}
+            <PageCard>
+                <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    mb={2}
+                >
+                    <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                        Transactions — {MONTHS.find(m => m.value === month)?.label} {year}
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        size="small"
+                        onClick={handleOpenAddTransaction}
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Add transaction
+                    </Button>
+                </Box>
+
+                {/* Search */}
+                <TextField
+                    placeholder="Search transactions..."
+                    size="small"
+                    fullWidth
+                    value={transactionSearch}
+                    onChange={(e) => setTransactionSearch(e.target.value)}
+                    sx={{ mb: 1.5 }}
+                    inputProps={{ style: { fontSize: 13 } }}
+                />
+
+                <Box
+                    sx={{
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        overflow: 'hidden'
+                    }}
+                >
+                    {/* Header */}
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px',
+                            px: 2,
+                            py: 1.5,
+                            bgcolor: 'background.default',
+                            borderBottom: '1px solid',
+                            borderColor: 'divider'
+                        }}
+                    >
+                        {['Date', 'Expense type', 'Amount', 'Payment', 'Description', ''].map((col, i) => (
+                            <Typography
+                                key={i}
+                                variant="caption"
+                                color="text.secondary"
+                                fontWeight={600}
+                            >
+                                {col}
+                            </Typography>
+                        ))}
+                    </Box>
+
+                    {/* Rows */}
+                    <Box
+                        sx={{
+                            maxHeight: 280,
+                            overflowY: 'auto',
+                            ...hideScrollbar
+                        }}
+                    >
+                        {filteredTransactions.length === 0 ? (
+                            <Box px={2} py={3}>
+                                <Typography variant="body2" color="text.secondary">
+                                    {transactionSearch
+                                        ? 'No transactions match your search.'
+                                        : 'No transactions for this month. Click Add transaction to get started.'
+                                    }
+                                </Typography>
+                            </Box>
+                        ) : (
+                            filteredTransactions.map((transaction, index) => (
+                                <Box
+                                    key={transaction.publicId}
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px',
+                                        px: 2,
+                                        py: 1.5,
+                                        alignItems: 'center',
+                                        borderBottom: index < filteredTransactions.length - 1
+                                            ? '1px solid' : 'none',
+                                        borderColor: 'divider',
+                                        '&:hover': { bgcolor: 'background.default' }
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary">
+                                        {new Date(transaction.transactionDate)
+                                            .toLocaleDateString('en-CA', {
+                                                month: 'short',
+                                                day: 'numeric'
+                                            })}
+                                    </Typography>
+                                    <Typography variant="body2" fontWeight={600}>
+                                        {transaction.expenseName}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                        color="error.main"
+                                    >
+                                        {formatCurrency(transaction.amount)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {transaction.paymentMethod}
+                                    </Typography>
+                                    <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        noWrap
+                                    >
+                                        {transaction.description || '—'}
+                                    </Typography>
+                                    <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                                        <Tooltip title="Edit">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => handleOpenEditTransaction(transaction)}
+                                            >
+                                                <EditIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Delete">
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => handleOpenDeleteTransaction(transaction)}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </Box>
+                            ))
+                        )}
+                    </Box>
+                </Box>
+            </PageCard>
+
+            {/* ─── Transaction Add/Edit Dialog ─────────────────── */}
+            <Dialog
+                open={transactionDialogOpen}
+                onClose={() => setTransactionDialogOpen(false)}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>
+                    {selectedTransaction ? 'Edit transaction' : 'Add transaction'}
+                </DialogTitle>
+                <DialogContent>
+                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                        <TextField
+                            label="Transaction date"
+                            type="date"
+                            value={transactionForm.transactionDate}
+                            onChange={(e) => setTransactionForm({
+                                ...transactionForm,
+                                transactionDate: e.target.value
+                            })}
+                            fullWidth
+                            required
+                            InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            select
+                            label="Expense type"
+                            value={transactionForm.expenseTypeId}
+                            onChange={(e) => setTransactionForm({
+                                ...transactionForm,
+                                expenseTypeId: e.target.value
+                            })}
+                            fullWidth
+                            required
+                        >
+                            {expenseTypes.map((type) => (
+                                <MenuItem key={type.id} value={type.id}>
+                                    {type.expenseName}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            label="Amount"
+                            type="number"
+                            value={transactionForm.amount}
+                            onChange={(e) => setTransactionForm({
+                                ...transactionForm,
+                                amount: e.target.value
+                            })}
+                            fullWidth
+                            required
+                            inputProps={{ min: 0, step: '0.01' }}
+                        />
+                        <TextField
+                            select
+                            label="Payment method"
+                            value={transactionForm.paymentMethodId}
+                            onChange={(e) => setTransactionForm({
+                                ...transactionForm,
+                                paymentMethodId: e.target.value
+                            })}
+                            fullWidth
+                            required
+                        >
+                            {paymentMethods.map((method) => (
+                                <MenuItem key={method.id} value={method.id}>
+                                    {method.methodName}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            label="Description"
+                            value={transactionForm.description}
+                            onChange={(e) => setTransactionForm({
+                                ...transactionForm,
+                                description: e.target.value
+                            })}
+                            fullWidth
+                            multiline
+                            rows={2}
+                            placeholder="Optional note"
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setTransactionDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleSaveTransaction}
+                        variant="contained"
+                        disabled={
+                            savingTransaction ||
+                            !transactionForm.transactionDate ||
+                            !transactionForm.expenseTypeId ||
+                            !transactionForm.amount ||
+                            !transactionForm.paymentMethodId
+                        }
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        {savingTransaction
+                            ? <CircularProgress size={20} color="inherit" />
+                            : selectedTransaction ? 'Save changes' : 'Add'
+                        }
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ─── Transaction Delete Dialog ───────────────────── */}
+            <Dialog
+                open={transactionDeleteDialogOpen}
+                onClose={() => setTransactionDeleteDialogOpen(false)}
+                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+            >
+                <DialogTitle sx={{ fontWeight: 700 }}>Remove transaction</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary">
+                        Are you sure you want to remove this transaction for{' '}
+                        <strong>{selectedTransaction?.expenseName}</strong> —{' '}
+                        <strong>{formatCurrency(selectedTransaction?.amount)}</strong>?
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => setTransactionDeleteDialogOpen(false)}
+                        variant="outlined"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteTransaction}
+                        variant="contained"
+                        color="error"
+                        sx={{ borderRadius: 2, textTransform: 'none' }}
+                    >
+                        Remove
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
 
             {/* ─── Withdrawal Edit Dialog ──────────────────────── */}
             <Dialog

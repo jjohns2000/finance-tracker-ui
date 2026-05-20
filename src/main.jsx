@@ -11,7 +11,7 @@ createRoot(document.getElementById('root')).render(
         <ThemeProviderWrapper>
             <CssBaseline />
             <App />
-            <HealthCheck />
+            {/* <HealthCheck /> */}
         </ThemeProviderWrapper>
     </StrictMode>
 );

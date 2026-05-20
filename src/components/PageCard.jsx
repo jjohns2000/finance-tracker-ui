@@ -1,5 +1,12 @@
 import { Paper } from '@mui/material';
 
+export const hideScrollbar = {
+    scrollbarWidth: 'none',
+    '&::-webkit-scrollbar': {
+        display: 'none'
+    }
+};
+
 const PageCard = ({ children, sx = {}, ...props }) => {
     return (
         <Paper
