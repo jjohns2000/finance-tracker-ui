@@ -27,3 +27,9 @@ export const getExpensePieData = async (month, year) => {
     });
     return response.data;
 };
+export const getSalaryTrend = async (month, year) => {
+    const response = await axiosInstance.get('/api/dashboard/salary-trend', {
+        params: { month, year }
+    });
+    return response.data;
+};

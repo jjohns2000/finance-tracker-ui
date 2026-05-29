@@ -476,7 +476,12 @@ const ExpensePage = () => {
                 showSnackbar('Transaction added successfully.', 'success');
             }
             setTransactionDialogOpen(false);
-            await fetchTransactions();
+
+            // Refresh both transactions and expense type entries
+            await Promise.all([
+                fetchTransactions(),
+                fetchExpenseTypeData()
+            ]);
         } catch (err) {
             showSnackbar('Failed to save transaction.', 'error');
         } finally {
@@ -487,8 +492,13 @@ const ExpensePage = () => {
         try {
             await deleteTransaction(selectedTransaction.publicId);
             showSnackbar('Transaction removed successfully.', 'info');
-            await fetchTransactions();
             setTransactionDeleteDialogOpen(false);
+
+            // Refresh both
+            await Promise.all([
+                fetchTransactions(),
+                fetchExpenseTypeData()
+            ]);
         } catch (err) {
             showSnackbar('Failed to remove transaction.', 'error');
         }
@@ -774,7 +784,7 @@ const ExpensePage = () => {
                                                     {entry ? formatCurrency(entry.actualAmount) : '—'}
                                                 </Typography>
                                                 <Box display="flex" justifyContent="flex-start" gap={0.5}>
-                                                    {!type.isSystemManaged && (
+                                                    {!type.isSystemManaged && !entry?.isSystemManaged && (
                                                         <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
                                                             <IconButton
                                                                 size="small"
@@ -784,7 +794,7 @@ const ExpensePage = () => {
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
-                                                    {!type.isSystemManaged && entry && (
+                                                    {!type.isSystemManaged && !entry?.isSystemManaged && entry && (
                                                         <Tooltip title="Delete entry">
                                                             <IconButton
                                                                 size="small"
@@ -795,8 +805,8 @@ const ExpensePage = () => {
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
-                                                    {type.isSystemManaged && (
-                                                        <Tooltip title="Auto-updated from credit card entries">
+                                                    {(type.isSystemManaged || entry?.isSystemManaged) && (
+                                                        <Tooltip title="Auto-updated from transactions">
                                                             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
                                                                 Auto
                                                             </Typography>
@@ -1209,22 +1219,25 @@ const ExpensePage = () => {
                             InputLabelProps={{ shrink: true }}
                         />
                         <TextField
-                            select
-                            label="Expense type"
-                            value={transactionForm.expenseTypeId}
-                            onChange={(e) => setTransactionForm({
-                                ...transactionForm,
-                                expenseTypeId: e.target.value
-                            })}
-                            fullWidth
-                            required
-                        >
-                            {expenseTypes.map((type) => (
-                                <MenuItem key={type.id} value={type.id}>
-                                    {type.expenseName}
-                                </MenuItem>
-                            ))}
-                        </TextField>
+                                select
+                                label="Expense type"
+                                value={transactionForm.expenseTypeId}
+                                onChange={(e) => setTransactionForm({
+                                    ...transactionForm,
+                                    expenseTypeId: e.target.value
+                                })}
+                                fullWidth
+                                required
+                            >
+                                {expenseTypes
+                                    .filter(t => !t.isRecurring)
+                                    .map((type) => (
+                                        <MenuItem key={type.id} value={type.id}>
+                                            {type.expenseName}
+                                        </MenuItem>
+                                    ))
+                                }
+                            </TextField>
                         <TextField
                             label="Amount"
                             type="number"

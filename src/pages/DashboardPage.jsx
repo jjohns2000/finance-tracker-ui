@@ -34,6 +34,8 @@ import {
     Cell,
     Sector
 } from 'recharts';
+import { getSalaryTrend } from '../api/dashboardApi';
+
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -131,15 +133,19 @@ const DashboardPage = () => {
     const tooltipBorder = isDark ? '#444' : '#ddd';
     const tooltipText = isDark ? '#eee' : '#333';
 
+    const [salaryTrend, setSalaryTrend] = useState([]);
+    const [salaryKeys, setSalaryKeys] = useState([]);
+
     const fetchDashboardData = async () => {
         setLoading(true);
         setChartsLoading(true);
         try {
-            const [kpiResult, trend, incomePieResult, expensePieResult] = await Promise.all([
+            const [kpiResult, trend, incomePieResult, expensePieResult, salaryTrendResult] = await Promise.all([
                 getKpiData(month, year),
                 getMonthlyTrend(month, year),
                 getIncomePieData(month, year),
-                getExpensePieData(month, year)
+                getExpensePieData(month, year),
+                getSalaryTrend(month, year)
             ]);
 
             setKpis([
@@ -164,6 +170,23 @@ const DashboardPage = () => {
                 label: d.label,
                 value: parseFloat(d.amount)
             })));
+
+            // Transform salary trend data
+            // Group by month/year label and create one key per company
+            const companies = [...new Set(salaryTrendResult.map(s => s.companyName))];
+            setSalaryKeys(companies);
+
+            const groupedByMonth = {};
+            salaryTrendResult.forEach(item => {
+                const key = `${MONTHS[item.month - 1].label.slice(0, 3)} ${String(item.year).slice(2)}`;
+                if (!groupedByMonth[key]) {
+                    groupedByMonth[key] = { name: key };
+                    companies.forEach(c => groupedByMonth[key][c] = 0);
+                }
+                groupedByMonth[key][item.companyName] = parseFloat(item.totalNetPay);
+            });
+
+            setSalaryTrend(Object.values(groupedByMonth));
 
         } catch (err) {
             console.error('Failed to load dashboard data', err);
@@ -500,6 +523,133 @@ const DashboardPage = () => {
                 )}
             </PageCard>
 
+            {/* Section 4 — Salary Trend */}
+            <PageCard>
+                {chartsLoading ? (
+                    <Box display="flex" justifyContent="center" py={6}>
+                        <CircularProgress size={24} />
+                    </Box>
+                ) : (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+
+                        {/* Salary line chart — full width in this row for now */}
+                        <Box
+                            sx={{
+                                flex: {
+                                    xs: '1 1 100%',
+                                    lg: '1 1 0'
+                                },
+                                minWidth: 0
+                            }}
+                        >
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
+                                Salary trend — last 12 months
+                            </Typography>
+                            {salaryTrend.length === 0 || salaryKeys.length === 0 ? (
+                                <Box display="flex" alignItems="center" justifyContent="center" height={240}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        No salary data available
+                                    </Typography>
+                                </Box>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <LineChart
+                                        data={salaryTrend}
+                                        margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                                        <XAxis
+                                            dataKey="name"
+                                            tick={{ fill: axisColor, fontSize: 11 }}
+                                            axisLine={{ stroke: gridColor }}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            tick={{ fill: axisColor, fontSize: 11 }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                                        />
+                                        <RechartsTooltip content={<CustomTooltip />} />
+                                        <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
+                                        {salaryKeys.map((company, index) => (
+                                            <Line
+                                                key={company}
+                                                type="monotone"
+                                                dataKey={company}
+                                                stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                                                strokeWidth={2}
+                                                dot={(props) => {
+                                                    const { cx, cy, payload } = props;
+                                                    if (payload[company] === 0) return <g key={`dot-${cx}-${cy}`} />;
+                                                    return (
+                                                        <circle
+                                                            key={`dot-${cx}-${cy}`}
+                                                            cx={cx}
+                                                            cy={cy}
+                                                            r={3}
+                                                            fill={CHART_COLORS[index % CHART_COLORS.length]}
+                                                        />
+                                                    );
+                                                }}
+                                                activeDot={{ r: 5 }}
+                                                connectNulls={false}
+                                                animationDuration={1200}
+                                                animationEasing="ease-out"
+                                            />
+                                        ))}
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            )}
+                        </Box>
+
+                        {/* Placeholder 2 */}
+                        <Box
+                            sx={{
+                                flex: {
+                                    xs: '1 1 100%',
+                                    lg: '1 1 0'
+                                },
+                                minWidth: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                height: 240,
+                                border: '1px dashed',
+                                borderColor: 'divider',
+                                borderRadius: 2
+                            }}
+                        >
+                            <Typography variant="body2" color="text.secondary">
+                                Coming soon
+                            </Typography>
+                        </Box>
+
+                        {/* Placeholder 3 */}
+                        <Box
+                            sx={{
+                                flex: {
+                                    xs: '1 1 100%',
+                                    lg: '1 1 0'
+                                },
+                                minWidth: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                height: 240,
+                                border: '1px dashed',
+                                borderColor: 'divider',
+                                borderRadius: 2
+                            }}
+                        >
+                            <Typography variant="body2" color="text.secondary">
+                                Coming soon
+                            </Typography>
+                        </Box>
+
+                    </Box>
+                )}
+            </PageCard>
         </PageLayout>
     );
 };
