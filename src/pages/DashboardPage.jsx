@@ -9,7 +9,6 @@ import {
 } from '../api/dashboardApi';
 import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
-import PageCard from '../components/PageCard';
 import CountUp from '../components/CountUp';
 import {
     Box,
@@ -35,7 +34,8 @@ import {
     Sector
 } from 'recharts';
 import { getSalaryTrend } from '../api/dashboardApi';
-
+import { getFinancialSummary } from '../api/dashboardApi';
+import PageCard, { hideScrollbar } from '../components/PageCard';
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -136,16 +136,19 @@ const DashboardPage = () => {
     const [salaryTrend, setSalaryTrend] = useState([]);
     const [salaryKeys, setSalaryKeys] = useState([]);
 
+    const [financialSummary, setFinancialSummary] = useState('');
+
     const fetchDashboardData = async () => {
         setLoading(true);
         setChartsLoading(true);
         try {
-            const [kpiResult, trend, incomePieResult, expensePieResult, salaryTrendResult] = await Promise.all([
+            const [kpiResult, trend, incomePieResult, expensePieResult, salaryTrendResult, summaryResult] = await Promise.all([
                 getKpiData(month, year),
                 getMonthlyTrend(month, year),
                 getIncomePieData(month, year),
                 getExpensePieData(month, year),
-                getSalaryTrend(month, year)
+                getSalaryTrend(month, year),
+                getFinancialSummary(month, year)
             ]);
 
             setKpis([
@@ -170,6 +173,8 @@ const DashboardPage = () => {
                 label: d.label,
                 value: parseFloat(d.amount)
             })));
+
+            setFinancialSummary(summaryResult.summary);
 
             // Transform salary trend data
             // Group by month/year label and create one key per company
@@ -292,49 +297,71 @@ const DashboardPage = () => {
                 </Box>
             </PageCard>
 
-            {/* Section 2 — KPI Cards */}
+            {/* Section 2 — KPI Cards + Financial Summary */}
             <PageCard>
                 {loading ? (
                     <Box display="flex" justifyContent="center" py={4}>
                         <CircularProgress size={24} />
                     </Box>
                 ) : (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {kpis.map((kpi, index) => (
-                            <Paper
-                                key={index}
-                                elevation={0}
+                    <Box display="flex" flexDirection="column" gap={2}>
+
+                        {/* KPI Cards */}
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            {kpis.map((kpi, index) => (
+                                <Paper
+                                    key={index}
+                                    elevation={0}
+                                    sx={{
+                                        flex: {
+                                            xs: '1 1 100%',
+                                            sm: '1 1 calc(50% - 8px)',
+                                            lg: '1 1 0'
+                                        },
+                                        minWidth: 0,
+                                        p: { xs: 2, sm: 3 },
+                                        borderRadius: 3,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        height: 120,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        bgcolor: 'background.default',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    <Typography variant="body2" color="text.secondary">
+                                        {kpi.label}
+                                    </Typography>
+                                    <Typography variant="h5" fontWeight={700}>
+                                        <CountUp value={kpi.value} prefix="$" duration={1200} />
+                                    </Typography>
+                                </Paper>
+                            ))}
+                        </Box>
+
+                        {/* Financial Summary */}
+                        {financialSummary && (
+                            <Box
                                 sx={{
-                                    flex: {
-                                        xs: '1 1 100%',
-                                        sm: '1 1 calc(50% - 8px)',
-                                        lg: '1 1 0'
-                                    },
-                                    minWidth: 0,
-                                    p: { xs: 2, sm: 3 },
-                                    borderRadius: 3,
+                                    p: 2,
+                                    borderRadius: 2,
                                     border: '1px solid',
                                     borderColor: 'divider',
-                                    height: 120,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    bgcolor: 'background.default',
-                                    boxSizing: 'border-box'
+                                    bgcolor: 'background.default'
                                 }}
                             >
-                                <Typography variant="body2" color="text.secondary">
-                                    {kpi.label}
+                                <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                    sx={{ lineHeight: 2 }}
+                                >
+                                    {financialSummary}
                                 </Typography>
-                                <Typography variant="h5" fontWeight={700}>
-                                    <CountUp
-                                        value={kpi.value}
-                                        prefix="$"
-                                        duration={1200}
-                                    />
-                                </Typography>
-                            </Paper>
-                        ))}
+                            </Box>
+                        )}
+
                     </Box>
                 )}
             </PageCard>

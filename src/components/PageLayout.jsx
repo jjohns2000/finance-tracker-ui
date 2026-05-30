@@ -1,8 +1,17 @@
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 
 const PageLayout = ({ sidebar, children }) => {
+    const theme = useTheme();
+    const isDark = theme.palette.mode === 'dark';
+
     return (
-        <Box sx={{ display: 'flex', height: '100vh', bgcolor: 'background.default' }}>
+        <Box
+            sx={{
+                display: 'flex',
+                minHeight: '100vh',
+                bgcolor: isDark ? '#0a0a0a' : '#f0f2f5',
+            }}
+        >
             {sidebar}
             <Box
                 sx={{
@@ -12,8 +21,11 @@ const PageLayout = ({ sidebar, children }) => {
                     display: 'flex',
                     flexDirection: 'column',
                     overflowY: 'auto',
-                    p: { xs: 1.5, sm: 2, md: 3 },
-                    gap: { xs: 1.5, sm: 2, md: 3 }
+                    pt: { xs: 8, md: 1.5 },
+                    pb: 1.5,
+                    pr: 1.5,
+                    pl: { xs: 1.5, md: 0 },
+                    gap: 1.5
                 }}
             >
                 {children}

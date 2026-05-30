@@ -33,3 +33,9 @@ export const getSalaryTrend = async (month, year) => {
     });
     return response.data;
 };
+export const getFinancialSummary = async (month, year) => {
+    const response = await axiosInstance.get('/api/dashboard/financial-summary', {
+        params: { month, year }
+    });
+    return response.data;
+};
