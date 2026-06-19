@@ -5,11 +5,15 @@ import {
     getKpiData,
     getMonthlyTrend,
     getIncomePieData,
-    getExpensePieData
+    getExpensePieData,
+    getSalaryTrend,
+    getFinancialSummary
 } from '../api/dashboardApi';
 import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import CountUp from '../components/CountUp';
+import PageCard, { hideScrollbar } from '../components/PageCard';
+import CreditCardIcon from '../components/CreditCardIcon';
 import {
     Box,
     Typography,
@@ -33,9 +37,7 @@ import {
     Cell,
     Sector
 } from 'recharts';
-import { getSalaryTrend } from '../api/dashboardApi';
-import { getFinancialSummary } from '../api/dashboardApi';
-import PageCard, { hideScrollbar } from '../components/PageCard';
+import { getMonthlyCreditCardSummary } from '../api/creditCardApi';
 
 const MONTHS = [
     { value: 1,  label: 'January' },
@@ -55,24 +57,22 @@ const MONTHS = [
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-// Matte colors that work in both light and dark mode
 const CHART_COLORS = [
-    '#7B8EC8', // muted blue
-    '#8FBD8F', // muted green
-    '#C49A6C', // muted amber
-    '#B07DB0', // muted purple
-    '#7FBCBC', // muted teal
-    '#C47E7E', // muted coral
-    '#9BB89B', // muted sage
-    '#C4A87E', // muted sand
-    '#8BA0C4', // muted steel blue
-    '#B8A07E', // muted tan
+    '#7B8EC8',
+    '#8FBD8F',
+    '#C49A6C',
+    '#B07DB0',
+    '#7FBCBC',
+    '#C47E7E',
+    '#9BB89B',
+    '#C4A87E',
+    '#8BA0C4',
+    '#B8A07E',
 ];
 
 const INCOME_COLOR  = '#7B8EC8';
 const EXPENSE_COLOR = '#C47E7E';
 
-// Animated active pie sector
 const renderActiveShape = (props) => {
     const {
         cx, cy, innerRadius, outerRadius, startAngle, endAngle,
@@ -90,22 +90,8 @@ const renderActiveShape = (props) => {
             <text x={cx} y={cy + 30} textAnchor="middle" fill={fill} fontSize={11}>
                 {(percent * 100).toFixed(1)}%
             </text>
-            <Sector
-                cx={cx} cy={cy}
-                innerRadius={innerRadius}
-                outerRadius={outerRadius + 8}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                fill={fill}
-            />
-            <Sector
-                cx={cx} cy={cy}
-                innerRadius={outerRadius + 12}
-                outerRadius={outerRadius + 16}
-                startAngle={startAngle}
-                endAngle={endAngle}
-                fill={fill}
-            />
+            <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 8} startAngle={startAngle} endAngle={endAngle} fill={fill} />
+            <Sector cx={cx} cy={cy} innerRadius={outerRadius + 12} outerRadius={outerRadius + 16} startAngle={startAngle} endAngle={endAngle} fill={fill} />
         </g>
     );
 };
@@ -126,31 +112,40 @@ const DashboardPage = () => {
     const [chartsLoading, setChartsLoading] = useState(true);
     const [activeIncomeIndex, setActiveIncomeIndex] = useState(0);
     const [activeExpenseIndex, setActiveExpenseIndex] = useState(0);
-
-    const axisColor = isDark ? '#888' : '#aaa';
-    const gridColor = isDark ? '#333' : '#eee';
-    const tooltipBg = isDark ? '#1e1e1e' : '#fff';
-    const tooltipBorder = isDark ? '#444' : '#ddd';
-    const tooltipText = isDark ? '#eee' : '#333';
-
     const [salaryTrend, setSalaryTrend] = useState([]);
     const [salaryKeys, setSalaryKeys] = useState([]);
-
     const [financialSummary, setFinancialSummary] = useState('');
+    const [creditCardSummary, setCreditCardSummary] = useState([]);
+
+    const axisColor     = isDark ? '#888' : '#aaa';
+    const gridColor     = isDark ? '#333' : '#eee';
+    const tooltipBg     = isDark ? '#1e1e1e' : '#fff';
+    const tooltipBorder = isDark ? '#444' : '#ddd';
+    const tooltipText   = isDark ? '#eee' : '#333';
 
     const fetchDashboardData = async () => {
         setLoading(true);
         setChartsLoading(true);
         try {
-            const [kpiResult, trend, incomePieResult, expensePieResult, salaryTrendResult, summaryResult] = await Promise.all([
+            const [
+                kpiResult,
+                trend,
+                incomePieResult,
+                expensePieResult,
+                salaryTrendResult,
+                summaryResult,
+                ccSummary
+            ] = await Promise.all([
                 getKpiData(month, year),
                 getMonthlyTrend(month, year),
                 getIncomePieData(month, year),
                 getExpensePieData(month, year),
                 getSalaryTrend(month, year),
-                getFinancialSummary(month, year)
+                getFinancialSummary(month, year),
+                getMonthlyCreditCardSummary(month, year)
             ]);
 
+            setCreditCardSummary(ccSummary);
             setKpis([
                 kpiResult.totalIncome,
                 kpiResult.totalExpenses,
@@ -176,8 +171,6 @@ const DashboardPage = () => {
 
             setFinancialSummary(summaryResult.summary);
 
-            // Transform salary trend data
-            // Group by month/year label and create one key per company
             const companies = [...new Set(salaryTrendResult.map(s => s.companyName))];
             setSalaryKeys(companies);
 
@@ -226,14 +219,7 @@ const DashboardPage = () => {
     const CustomTooltip = ({ active, payload, label }) => {
         if (!active || !payload?.length) return null;
         return (
-            <Box
-                sx={{
-                    bgcolor: tooltipBg,
-                    border: `1px solid ${tooltipBorder}`,
-                    borderRadius: 2,
-                    p: 1.5
-                }}
-            >
+            <Box sx={{ bgcolor: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 2, p: 1.5 }}>
                 <Typography variant="caption" sx={{ color: tooltipText, fontWeight: 600, display: 'block', mb: 0.5 }}>
                     {label}
                 </Typography>
@@ -241,6 +227,105 @@ const DashboardPage = () => {
                     <Typography key={i} variant="caption" sx={{ color: entry.color, display: 'block' }}>
                         {entry.name}: {formatCurrency(entry.value)}
                     </Typography>
+                ))}
+            </Box>
+        );
+    };
+
+    // ─── Year Progress Widget ─────────────────────────────────────────
+    const YearProgressWidget = () => {
+        const today        = new Date();
+        const widgetYear   = today.getFullYear();
+        const currentMonth = today.getMonth();
+        const currentDay   = today.getDate();
+
+        const pastColor   = isDark ? '#4a4a4a' : '#b0b0b0';
+        const futureColor = isDark ? '#1e1e1e' : '#e0e0e0';
+        const todayColor  = '#4caf50';
+
+        const getDaysInMonth = (m, y) => new Date(y, m + 1, 0).getDate();
+
+        const getDayState = (m, d) => {
+            if (m < currentMonth) return 'past';
+            if (m > currentMonth) return 'future';
+            if (d < currentDay)   return 'past';
+            if (d === currentDay) return 'today';
+            return 'future';
+        };
+
+        const quarters = [
+            { label: 'Q1', months: [0, 1, 2] },
+            { label: 'Q2', months: [3, 4, 5] },
+            { label: 'Q3', months: [6, 7, 8] },
+            { label: 'Q4', months: [9, 10, 11] }
+        ];
+
+        const currentQuarterIndex = Math.floor(currentMonth / 3);
+
+        const MonthGrid = ({ monthIndex }) => {
+            const daysInMonth = getDaysInMonth(monthIndex, widgetYear);
+            return (
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75} sx={{ fontSize: 11 }}>
+                        {MONTHS[monthIndex].label}
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+                            const state   = getDayState(monthIndex, day);
+                            const isToday = state === 'today';
+                            return (
+                                <Box
+                                    key={day}
+                                    sx={{
+                                        width: 10,
+                                        height: 10,
+                                        borderRadius: '2px',
+                                        flexShrink: 0,
+                                        bgcolor: isToday ? todayColor : state === 'past' ? pastColor : futureColor,
+                                        ...(isToday && {
+                                            animation: 'pulseGreen 1.5s ease-in-out infinite',
+                                            '@keyframes pulseGreen': {
+                                                '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+                                                '50%': { opacity: 0.5, transform: 'scale(0.8)' }
+                                            }
+                                        })
+                                    }}
+                                />
+                            );
+                        })}
+                    </Box>
+                </Box>
+            );
+        };
+
+        const QuarterCard = ({ label, months, index }) => (
+            <Box
+                sx={{
+                    flex: { xs: '1 1 100%', md: '1 1 calc(50% - 8px)' },
+                    minWidth: 0,
+                    display: { xs: index === currentQuarterIndex ? 'block' : 'none', md: 'block' },
+                    p: 2,
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.default'
+                }}
+            >
+                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={1.5} sx={{ fontSize: 11, letterSpacing: 1 }}>
+                    {label} · {widgetYear}
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                    {months.map((m) => (
+                        <MonthGrid key={m} monthIndex={m} />
+                    ))}
+                </Box>
+            </Box>
+        );
+
+        return (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                {quarters.map((q, index) => (
+                    <QuarterCard key={q.label} label={q.label} months={q.months} index={index} />
                 ))}
             </Box>
         );
@@ -260,64 +345,32 @@ const DashboardPage = () => {
                 }}
             >
                 <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                        Welcome, {user?.firstName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Your financial overview
-                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>Welcome, {user?.firstName}</Typography>
+                    <Typography variant="body2" color="text.secondary">Financial Dashboard</Typography>
                 </Box>
                 <Box display="flex" gap={2}>
-                    <TextField
-                        select
-                        label="Month"
-                        value={month}
-                        onChange={(e) => setMonth(parseInt(e.target.value))}
-                        size="small"
-                        sx={{ width: 140 }}
-                    >
-                        {MONTHS.map((m) => (
-                            <MenuItem key={m.value} value={m.value}>
-                                {m.label}
-                            </MenuItem>
-                        ))}
+                    <TextField select label="Month" value={month} onChange={(e) => setMonth(parseInt(e.target.value))} size="small" sx={{ width: 140 }}>
+                        {MONTHS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
                     </TextField>
-                    <TextField
-                        select
-                        label="Year"
-                        value={year}
-                        onChange={(e) => setYear(parseInt(e.target.value))}
-                        size="small"
-                        sx={{ width: 100 }}
-                    >
-                        {YEARS.map((y) => (
-                            <MenuItem key={y} value={y}>{y}</MenuItem>
-                        ))}
+                    <TextField select label="Year" value={year} onChange={(e) => setYear(parseInt(e.target.value))} size="small" sx={{ width: 100 }}>
+                        {YEARS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
                     </TextField>
                 </Box>
             </PageCard>
 
-            {/* Section 2 — KPI Cards + Financial Summary */}
+            {/* Section 2 — KPI Cards */}
             <PageCard>
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={24} />
-                    </Box>
+                    <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
                 ) : (
                     <Box display="flex" flexDirection="column" gap={2}>
-
-                        {/* KPI Cards */}
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                             {kpis.map((kpi, index) => (
                                 <Paper
                                     key={index}
                                     elevation={0}
                                     sx={{
-                                        flex: {
-                                            xs: '1 1 100%',
-                                            sm: '1 1 calc(50% - 8px)',
-                                            lg: '1 1 0'
-                                        },
+                                        flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', lg: '1 1 0' },
                                         minWidth: 0,
                                         p: { xs: 2, sm: 3 },
                                         borderRadius: 3,
@@ -331,65 +384,50 @@ const DashboardPage = () => {
                                         boxSizing: 'border-box'
                                     }}
                                 >
-                                    <Typography variant="body2" color="text.secondary">
-                                        {kpi.label}
-                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">{kpi.label}</Typography>
                                     <Typography variant="h5" fontWeight={700}>
                                         <CountUp value={kpi.value} prefix="$" duration={1200} />
                                     </Typography>
                                 </Paper>
                             ))}
                         </Box>
-
-                        {/* Financial Summary */}
-                        {financialSummary && (
-                            <Box
-                                sx={{
-                                    p: 2,
-                                    borderRadius: 2,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'background.default'
-                                }}
-                            >
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{ lineHeight: 2 }}
-                                >
-                                    {financialSummary}
-                                </Typography>
-                            </Box>
-                        )}
-
                     </Box>
                 )}
             </PageCard>
 
-            {/* Section 3 — Charts */}
+            {/* Section 3 — Year Progress */}
+            <PageCard>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Typography variant="body2" fontWeight={600} color="text.secondary">
+                        Year progress — {new Date().getFullYear()}
+                    </Typography>
+                    <Box display="flex" alignItems="center" gap={2}>
+                        <Box display="flex" alignItems="center" gap={0.75}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: '#4caf50' }} />
+                            <Typography variant="caption" color="text.secondary">Today</Typography>
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={0.75}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#4a4a4a' : '#b0b0b0' }} />
+                            <Typography variant="caption" color="text.secondary">Past</Typography>
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={0.75}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#1e1e1e' : '#e0e0e0' }} />
+                            <Typography variant="caption" color="text.secondary">Upcoming</Typography>
+                        </Box>
+                    </Box>
+                </Box>
+                <YearProgressWidget />
+            </PageCard>
+
+            {/* Section 4 — Overview */}
             <PageCard>
                 {chartsLoading ? (
-                    <Box display="flex" justifyContent="center" py={6}>
-                        <CircularProgress size={24} />
-                    </Box>
+                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
                 ) : (
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 3
-                        }}
-                    >
-                        {/* Chart 1 — Line Chart */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0
-                            }}
-                        >
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+
+                        {/* Income vs Expense Line Chart */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
                             <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
                                 Income vs Expense - last 12 months
                             </Typography>
@@ -401,148 +439,104 @@ const DashboardPage = () => {
                                 <ResponsiveContainer width="100%" height={240}>
                                     <LineChart data={trendData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                                        <XAxis
-                                            dataKey="name"
-                                            tick={{ fill: axisColor, fontSize: 11 }}
-                                            axisLine={{ stroke: gridColor }}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fill: axisColor, fontSize: 11 }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tickFormatter={(v) => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`}
-                                        />
+                                        <XAxis dataKey="name" tick={{ fill: axisColor, fontSize: 11 }} axisLine={{ stroke: gridColor }} tickLine={false} />
+                                        <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
                                         <RechartsTooltip content={<CustomTooltip />} />
-                                        <Legend
-                                            wrapperStyle={{ fontSize: 12, color: axisColor }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="Income"
-                                            stroke={INCOME_COLOR}
-                                            strokeWidth={2}
-                                            dot={{ r: 3, fill: INCOME_COLOR }}
-                                            activeDot={{ r: 5 }}
-                                            animationDuration={1200}
-                                            animationEasing="ease-out"
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="Expense"
-                                            stroke={EXPENSE_COLOR}
-                                            strokeWidth={2}
-                                            dot={{ r: 3, fill: EXPENSE_COLOR }}
-                                            activeDot={{ r: 5 }}
-                                            animationDuration={1200}
-                                            animationEasing="ease-out"
-                                        />
+                                        <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
+                                        <Line type="monotone" dataKey="Income" stroke={INCOME_COLOR} strokeWidth={2} dot={{ r: 3, fill: INCOME_COLOR }} activeDot={{ r: 5 }} animationDuration={1200} animationEasing="ease-out" />
+                                        <Line type="monotone" dataKey="Expense" stroke={EXPENSE_COLOR} strokeWidth={2} dot={{ r: 3, fill: EXPENSE_COLOR }} activeDot={{ r: 5 }} animationDuration={1200} animationEasing="ease-out" />
                                     </LineChart>
                                 </ResponsiveContainer>
                             )}
                         </Box>
 
-                        {/* Chart 2 — Income Pie */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0
-                            }}
-                        >
-                            <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
-                                Income sources - {MONTHS.find(m => m.value === month)?.label} {year}
-                            </Typography>
-                            {incomePie.length === 0 ? (
-                                <Box display="flex" alignItems="center" justifyContent="center" height={240}>
-                                    <Typography variant="body2" color="text.secondary">No data available</Typography>
+                        {/* Financial Summary */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0, height: 240, overflowY: 'auto', ...hideScrollbar }}>
+                            {financialSummary ? (
+                                <Box sx={{ p: 2, height: '100%', borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default', boxSizing: 'border-box' }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 2 }}>
+                                        {financialSummary}
+                                    </Typography>
                                 </Box>
                             ) : (
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <PieChart>
-                                        <Pie
-                                            activeIndex={activeIncomeIndex}
-                                            activeShape={renderActiveShape}
-                                            data={incomePie}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={85}
-                                            dataKey="value"
-                                            nameKey="label"
-                                            onMouseEnter={(_, index) => setActiveIncomeIndex(index)}
-                                            animationBegin={0}
-                                            animationDuration={1000}
-                                            animationEasing="ease-out"
-                                        >
-                                            {incomePie.map((_, index) => (
-                                                <Cell
-                                                    key={`income-${index}`}
-                                                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Legend
-                                            formatter={(value) => (
-                                                <span style={{ fontSize: 11, color: axisColor }}>{value}</span>
-                                            )}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+                                    <Typography variant="body2" color="text.secondary">No summary available</Typography>
+                                </Box>
                             )}
                         </Box>
 
-                        {/* Chart 3 — Expense Pie */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0
-                            }}
-                        >
+                        {/* Credit Card Utilization */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
                             <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
-                                Expense breakdown - {MONTHS.find(m => m.value === month)?.label} {year}
+                                Credit utilization — {MONTHS.find(m => m.value === month)?.label} {year}
                             </Typography>
-                            {expensePie.length === 0 ? (
+                            {creditCardSummary.length === 0 ? (
                                 <Box display="flex" alignItems="center" justifyContent="center" height={240}>
-                                    <Typography variant="body2" color="text.secondary">No data available</Typography>
+                                    <Typography variant="body2" color="text.secondary">No credit card data available</Typography>
                                 </Box>
                             ) : (
-                                <ResponsiveContainer width="100%" height={240}>
-                                    <PieChart>
-                                        <Pie
-                                            activeIndex={activeExpenseIndex}
-                                            activeShape={renderActiveShape}
-                                            data={expensePie}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={85}
-                                            dataKey="value"
-                                            nameKey="label"
-                                            onMouseEnter={(_, index) => setActiveExpenseIndex(index)}
-                                            animationBegin={200}
-                                            animationDuration={1000}
-                                            animationEasing="ease-out"
-                                        >
-                                            {expensePie.map((_, index) => (
-                                                <Cell
-                                                    key={`expense-${index}`}
-                                                    fill={CHART_COLORS[index % CHART_COLORS.length]}
-                                                />
-                                            ))}
-                                        </Pie>
-                                        <Legend
-                                            formatter={(value) => (
-                                                <span style={{ fontSize: 11, color: axisColor }}>{value}</span>
-                                            )}
-                                        />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxHeight: 240, overflowY: 'auto', ...hideScrollbar }}>
+                                    {creditCardSummary.map((card) => {
+                                        const utilization = card.creditLimit > 0
+                                            ? Math.min((card.billAmount / card.creditLimit) * 100, 100)
+                                            : 0;
+
+                                        const utilizationColor =
+                                            utilization >= 50 ? '#f44336' :
+                                            utilization >= 30 ? '#f59e0b' :
+                                            utilization >= 10 ? '#7B8EC8' :
+                                            '#4caf50';
+
+                                        const utilizationLabel =
+                                            utilization >= 50  ? 'Bad / High Risk'  :
+                                            utilization >= 30  ? 'Normal / Fair'    :
+                                            utilization >= 10  ? 'Good'             :
+                                            utilization > 0    ? 'Best / Excellent' :
+                                            'No usage';
+
+                                        return (
+                                            <Box key={card.publicId}>
+                                                {/* Card icon + name + amounts */}
+                                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.75}>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />
+                                                        <Typography variant="body2" fontWeight={600}>
+                                                            {card.cardName}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {formatCurrency(card.billAmount)} / {formatCurrency(card.creditLimit)}
+                                                    </Typography>
+                                                </Box>
+
+                                                {/* Progress bar */}
+                                                <Box sx={{ position: 'relative', height: 8, borderRadius: 4, bgcolor: isDark ? '#2b2b2b' : '#e0e0e0', overflow: 'hidden' }}>
+                                                    <Box
+                                                        sx={{
+                                                            position: 'absolute',
+                                                            left: 0, top: 0,
+                                                            height: '100%',
+                                                            width: `${utilization}%`,
+                                                            borderRadius: 4,
+                                                            bgcolor: utilizationColor,
+                                                            transition: 'width 1s ease-out'
+                                                        }}
+                                                    />
+                                                </Box>
+
+                                                {/* Tier label + percentage */}
+                                                <Box display="flex" justifyContent="space-between" mt={0.5}>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {utilizationLabel}
+                                                    </Typography>
+                                                    <Typography variant="caption" fontWeight={600} sx={{ color: utilizationColor }}>
+                                                        {utilization.toFixed(1)}%
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })}
+                                </Box>
                             )}
                         </Box>
 
@@ -550,53 +544,28 @@ const DashboardPage = () => {
                 )}
             </PageCard>
 
-            {/* Section 4 — Salary Trend */}
+            {/* Section 5 — Income related */}
             <PageCard>
                 {chartsLoading ? (
-                    <Box display="flex" justifyContent="center" py={6}>
-                        <CircularProgress size={24} />
-                    </Box>
+                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
                 ) : (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
 
-                        {/* Salary line chart — full width in this row for now */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0
-                            }}
-                        >
+                        {/* Salary Trend */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
                             <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
                                 Salary trend — last 12 months
                             </Typography>
                             {salaryTrend.length === 0 || salaryKeys.length === 0 ? (
                                 <Box display="flex" alignItems="center" justifyContent="center" height={240}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        No salary data available
-                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">No salary data available</Typography>
                                 </Box>
                             ) : (
                                 <ResponsiveContainer width="100%" height={240}>
-                                    <LineChart
-                                        data={salaryTrend}
-                                        margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                                    >
+                                    <LineChart data={salaryTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-                                        <XAxis
-                                            dataKey="name"
-                                            tick={{ fill: axisColor, fontSize: 11 }}
-                                            axisLine={{ stroke: gridColor }}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fill: axisColor, fontSize: 11 }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
-                                        />
+                                        <XAxis dataKey="name" tick={{ fill: axisColor, fontSize: 11 }} axisLine={{ stroke: gridColor }} tickLine={false} />
+                                        <YAxis tick={{ fill: axisColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
                                         <RechartsTooltip content={<CustomTooltip />} />
                                         <Legend wrapperStyle={{ fontSize: 12, color: axisColor }} />
                                         {salaryKeys.map((company, index) => (
@@ -609,15 +578,7 @@ const DashboardPage = () => {
                                                 dot={(props) => {
                                                     const { cx, cy, payload } = props;
                                                     if (payload[company] === 0) return <g key={`dot-${cx}-${cy}`} />;
-                                                    return (
-                                                        <circle
-                                                            key={`dot-${cx}-${cy}`}
-                                                            cx={cx}
-                                                            cy={cy}
-                                                            r={3}
-                                                            fill={CHART_COLORS[index % CHART_COLORS.length]}
-                                                        />
-                                                    );
+                                                    return <circle key={`dot-${cx}-${cy}`} cx={cx} cy={cy} r={3} fill={CHART_COLORS[index % CHART_COLORS.length]} />;
                                                 }}
                                                 activeDot={{ r: 5 }}
                                                 connectNulls={false}
@@ -630,53 +591,78 @@ const DashboardPage = () => {
                             )}
                         </Box>
 
-                        {/* Placeholder 2 */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                height: 240,
-                                border: '1px dashed',
-                                borderColor: 'divider',
-                                borderRadius: 2
-                            }}
-                        >
-                            <Typography variant="body2" color="text.secondary">
-                                Coming soon
+                        {/* Income Pie */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
+                                Income sources - {MONTHS.find(m => m.value === month)?.label} {year}
                             </Typography>
+                            {incomePie.length === 0 ? (
+                                <Box display="flex" alignItems="center" justifyContent="center" height={240}>
+                                    <Typography variant="body2" color="text.secondary">No data available</Typography>
+                                </Box>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <PieChart>
+                                        <Pie activeIndex={activeIncomeIndex} activeShape={renderActiveShape} data={incomePie} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" nameKey="label" onMouseEnter={(_, index) => setActiveIncomeIndex(index)} animationBegin={0} animationDuration={1000} animationEasing="ease-out">
+                                            {incomePie.map((_, index) => <Cell key={`income-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                                        </Pie>
+                                        <Legend formatter={(value) => <span style={{ fontSize: 11, color: axisColor }}>{value}</span>} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            )}
                         </Box>
 
-                        {/* Placeholder 3 */}
-                        <Box
-                            sx={{
-                                flex: {
-                                    xs: '1 1 100%',
-                                    lg: '1 1 0'
-                                },
-                                minWidth: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                height: 240,
-                                border: '1px dashed',
-                                borderColor: 'divider',
-                                borderRadius: 2
-                            }}
-                        >
-                            <Typography variant="body2" color="text.secondary">
-                                Coming soon
-                            </Typography>
+                        {/* Placeholder */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+                            <Typography variant="body2" color="text.secondary">Coming soon</Typography>
                         </Box>
 
                     </Box>
                 )}
             </PageCard>
+
+            {/* Section 6 — Expenses related */}
+            <PageCard>
+                {chartsLoading ? (
+                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
+                ) : (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+
+                        {/* Placeholder */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+                            <Typography variant="body2" color="text.secondary">Coming soon</Typography>
+                        </Box>
+
+                        {/* Expense Pie */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={600} color="text.secondary" mb={2}>
+                                Expense breakdown - {MONTHS.find(m => m.value === month)?.label} {year}
+                            </Typography>
+                            {expensePie.length === 0 ? (
+                                <Box display="flex" alignItems="center" justifyContent="center" height={240}>
+                                    <Typography variant="body2" color="text.secondary">No data available</Typography>
+                                </Box>
+                            ) : (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <PieChart>
+                                        <Pie activeIndex={activeExpenseIndex} activeShape={renderActiveShape} data={expensePie} cx="50%" cy="50%" innerRadius={60} outerRadius={85} dataKey="value" nameKey="label" onMouseEnter={(_, index) => setActiveExpenseIndex(index)} animationBegin={200} animationDuration={1000} animationEasing="ease-out">
+                                            {expensePie.map((_, index) => <Cell key={`expense-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                                        </Pie>
+                                        <Legend formatter={(value) => <span style={{ fontSize: 11, color: axisColor }}>{value}</span>} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            )}
+                        </Box>
+
+                        {/* Placeholder */}
+                        <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, border: '1px dashed', borderColor: 'divider', borderRadius: 2 }}>
+                            <Typography variant="body2" color="text.secondary">Coming soon</Typography>
+                        </Box>
+
+                    </Box>
+                )}
+            </PageCard>
+
         </PageLayout>
     );
 };

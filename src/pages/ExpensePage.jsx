@@ -16,6 +16,7 @@ import { useSnackbar } from '../context/SnackbarContext';
 import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import PageCard, { hideScrollbar } from '../components/PageCard';
+import CreditCardIcon from '../components/CreditCardIcon';
 import {
     Box,
     Typography,
@@ -186,7 +187,6 @@ const ExpensePage = () => {
                 setAccounts(accs);
                 setCreditCards(cards);
                 setPaymentMethods(methods);
-                console.log('Payment methods:', methods);
             } catch (err) {
                 console.error('Failed to initialize', err);
             }
@@ -286,7 +286,6 @@ const ExpensePage = () => {
             maximumFractionDigits: 2
         })}`;
 
-    // Sort by actual amount if entry exists, else default amount, descending
     const sortByAmount = (types) =>
         [...types].sort((a, b) => {
             const aEntry = getEntryForType(a.id);
@@ -307,6 +306,7 @@ const ExpensePage = () => {
             .filter(t => !t.isRecurring)
             .filter(t => t.expenseName.toLowerCase().includes(oneTimeSearch.toLowerCase()))
     );
+
     const TrendValue = ({ value }) => {
         const positive = (value ?? 0) >= 0;
         return (
@@ -327,7 +327,7 @@ const ExpensePage = () => {
     };
 
     const getCreditCardEntry = (cardId) =>
-    monthlyCreditCards.find(m => m.creditCardId === cardId) || null;
+        monthlyCreditCards.find(m => m.creditCardId === cardId) || null;
 
     const handleOpenCreditCardEntry = (card) => {
         const existing = getCreditCardEntry(card.id);
@@ -352,8 +352,6 @@ const ExpensePage = () => {
             });
             showSnackbar('Credit card entry saved successfully.', 'success');
             setCreditCardDialogOpen(false);
-
-            // Refresh both credit card and expense type data together
             await Promise.all([
                 fetchCreditCardData(),
                 fetchExpenseTypeData()
@@ -426,28 +424,26 @@ const ExpensePage = () => {
         });
         setTransactionDialogOpen(true);
     };
+
     const handleOpenEditTransaction = (transaction) => {
-    setSelectedTransaction(transaction);
-    const expenseType = expenseTypes.find(
-        t => t.expenseName === transaction.expenseName
-    );
-    const paymentMethod = paymentMethods.find(
-            m => m.methodName === transaction.paymentMethod
-        );
+        setSelectedTransaction(transaction);
+        const expenseType = expenseTypes.find(t => t.expenseName === transaction.expenseName);
+        const paymentMethod = paymentMethods.find(m => m.methodName === transaction.paymentMethod);
         setTransactionForm({
             expenseTypeId: expenseType?.id || '',
             paymentMethodId: paymentMethod?.id || '',
             amount: transaction.amount,
             description: transaction.description || '',
-            transactionDate: new Date(transaction.transactionDate)
-                .toISOString().split('T')[0]
+            transactionDate: new Date(transaction.transactionDate).toISOString().split('T')[0]
         });
         setTransactionDialogOpen(true);
     };
+
     const handleOpenDeleteTransaction = (transaction) => {
         setSelectedTransaction(transaction);
         setTransactionDeleteDialogOpen(true);
     };
+
     const handleSaveTransaction = async () => {
         setSavingTransaction(true);
         try {
@@ -476,8 +472,6 @@ const ExpensePage = () => {
                 showSnackbar('Transaction added successfully.', 'success');
             }
             setTransactionDialogOpen(false);
-
-            // Refresh both transactions and expense type entries
             await Promise.all([
                 fetchTransactions(),
                 fetchExpenseTypeData()
@@ -488,13 +482,12 @@ const ExpensePage = () => {
             setSavingTransaction(false);
         }
     };
+
     const handleDeleteTransaction = async () => {
         try {
             await deleteTransaction(selectedTransaction.publicId);
             showSnackbar('Transaction removed successfully.', 'info');
             setTransactionDeleteDialogOpen(false);
-
-            // Refresh both
             await Promise.all([
                 fetchTransactions(),
                 fetchExpenseTypeData()
@@ -524,35 +517,25 @@ const ExpensePage = () => {
                 }}
             >
                 <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                        Expense
-                    </Typography>
+                    <Typography variant="h6" fontWeight={700}>Expense</Typography>
                     <Typography variant="body2" color="text.secondary">
                         Monthly expense overview
                     </Typography>
                 </Box>
                 <Box display="flex" gap={2}>
                     <TextField
-                        select
-                        label="Month"
-                        value={month}
+                        select label="Month" value={month}
                         onChange={(e) => setMonth(parseInt(e.target.value))}
-                        size="small"
-                        sx={{ width: 140 }}
+                        size="small" sx={{ width: 140 }}
                     >
                         {MONTHS.map((m) => (
-                            <MenuItem key={m.value} value={m.value}>
-                                {m.label}
-                            </MenuItem>
+                            <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
                         ))}
                     </TextField>
                     <TextField
-                        select
-                        label="Year"
-                        value={year}
+                        select label="Year" value={year}
                         onChange={(e) => setYear(parseInt(e.target.value))}
-                        size="small"
-                        sx={{ width: 100 }}
+                        size="small" sx={{ width: 100 }}
                     >
                         {YEARS.map((y) => (
                             <MenuItem key={y} value={y}>{y}</MenuItem>
@@ -568,98 +551,36 @@ const ExpensePage = () => {
                         <CircularProgress size={24} />
                     </Box>
                 ) : (
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: { xs: 'column', md: 'row' },
-                            gap: 3
-                        }}
-                    >
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
                         {/* Left — Aggregate Totals */}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                fontWeight={600}
-                                mb={2}
-                            >
+                            <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
                                 Aggregate total
                             </Typography>
-                            <Box
-                                sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
-                                    gap: 1.5
-                                }}
-                            >
-                                <MetricBox
-                                    label="Opening balance"
-                                    rawValue={aggregate?.totalOpeningBalance}
-                                />
-                                <MetricBox
-                                    label="Total withdrawal"
-                                    rawValue={aggregate?.totalWithdrawal}
-                                    color="error.main"
-                                />
-                                <MetricBox
-                                    label="Closing balance"
-                                    rawValue={aggregate?.totalClosingBalance}
-                                />
-                                <Box
-                                    sx={{
-                                        p: 2,
-                                        borderRadius: 2,
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        bgcolor: 'background.default'
-                                    }}
-                                >
-                                    <Typography variant="caption" color="text.secondary">
-                                        Trend
-                                    </Typography>
-                                    <Box mt={0.5}>
-                                        <TrendValue value={aggregate?.totalTrend} />
-                                    </Box>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                                <MetricBox label="Opening balance" rawValue={aggregate?.totalOpeningBalance} />
+                                <MetricBox label="Total withdrawal" rawValue={aggregate?.totalWithdrawal} color="error.main" />
+                                <MetricBox label="Closing balance" rawValue={aggregate?.totalClosingBalance} />
+                                <Box sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
+                                    <Typography variant="caption" color="text.secondary">Trend</Typography>
+                                    <Box mt={0.5}><TrendValue value={aggregate?.totalTrend} /></Box>
                                 </Box>
                             </Box>
                         </Box>
 
-                        <Divider
-                            orientation="vertical"
-                            flexItem
-                            sx={{ display: { xs: 'none', md: 'block' } }}
-                        />
+                        <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
                         <Divider sx={{ display: { xs: 'block', md: 'none' } }} />
 
                         {/* Right — Contributing Accounts */}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                fontWeight={600}
-                                mb={2}
-                            >
+                            <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
                                 Contributing accounts
                             </Typography>
-                            <Box
-                                sx={{
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    borderRadius: 2,
-                                    overflow: 'hidden',
-                                    maxHeight: 260,
-                                    overflowY: 'auto'
-                                }}
-                            >
-                                <ListHeader
-                                    columns={['Bank', 'Type', 'Withdrawal']}
-                                    gridTemplateColumns="2fr 1fr 1fr"
-                                />
+                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', maxHeight: 260, overflowY: 'auto' }}>
+                                <ListHeader columns={['Bank', 'Type', 'Withdrawal']} gridTemplateColumns="2fr 1fr 1fr" />
                                 {accounts.length === 0 ? (
                                     <Box px={2} py={3}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            No accounts found.
-                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">No accounts found.</Typography>
                                     </Box>
                                 ) : (
                                     accounts.map((account, index) => {
@@ -671,29 +592,17 @@ const ExpensePage = () => {
                                                 sx={{
                                                     display: 'grid',
                                                     gridTemplateColumns: '2fr 1fr 1fr',
-                                                    px: 2,
-                                                    py: 1.5,
+                                                    px: 2, py: 1.5,
                                                     alignItems: 'center',
                                                     cursor: 'pointer',
-                                                    borderBottom: index < accounts.length - 1
-                                                        ? '1px solid' : 'none',
+                                                    borderBottom: index < accounts.length - 1 ? '1px solid' : 'none',
                                                     borderColor: 'divider',
-                                                    '&:hover': {
-                                                        bgcolor: 'action.hover'
-                                                    }
+                                                    '&:hover': { bgcolor: 'action.hover' }
                                                 }}
                                             >
-                                                <Typography variant="body2" fontWeight={500} noWrap>
-                                                    {account.bankName}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary" noWrap>
-                                                    {account.accountType}
-                                                </Typography>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={600}
-                                                    color="error.main"
-                                                >
+                                                <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>
+                                                <Typography variant="body2" color="text.secondary" noWrap>{account.accountType}</Typography>
+                                                <Typography variant="body2" fontWeight={600} color="error.main">
                                                     {formatCurrency(data?.withdrawal)}
                                                 </Typography>
                                             </Box>
@@ -711,46 +620,26 @@ const ExpensePage = () => {
                 <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
                     Expense types — {MONTHS.find(m => m.value === month)?.label} {year}
                 </Typography>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', md: 'row' },
-                        gap: 3
-                    }}
-                >
-                    {/* Left — Recurring */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+                    {/* Recurring */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">
                             Recurring
                         </Typography>
-                        {/* Search */}
                         <TextField
                             placeholder="Search recurring..."
-                            size="small"
-                            fullWidth
+                            size="small" fullWidth
                             value={recurringSearch}
                             onChange={(e) => setRecurringSearch(e.target.value)}
                             sx={{ mb: 1 }}
                             inputProps={{ style: { fontSize: 13 } }}
                         />
-                        <Box
-                            sx={{
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 2,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <ListHeader
-                                columns={['Expense', 'Default', 'Actual', '']}
-                                gridTemplateColumns="2fr 1fr 1fr 60px"
-                            />
+                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                            <ListHeader columns={['Expense', 'Default', 'Actual', '']} gridTemplateColumns="2fr 1fr 1fr 60px" />
                             <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
                                 {recurringTypes.length === 0 ? (
                                     <Box px={2} py={3}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            No active recurring expenses.
-                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">No active recurring expenses.</Typography>
                                     </Box>
                                 ) : (
                                     recurringTypes.map((type, index, arr) => {
@@ -761,55 +650,36 @@ const ExpensePage = () => {
                                                 sx={{
                                                     display: 'grid',
                                                     gridTemplateColumns: '2fr 1fr 1fr 60px',
-                                                    px: 2,
-                                                    py: 1.5,
+                                                    px: 2, py: 1.5,
                                                     alignItems: 'center',
-                                                    borderBottom: index < arr.length - 1
-                                                        ? '1px solid' : 'none',
+                                                    borderBottom: index < arr.length - 1 ? '1px solid' : 'none',
                                                     borderColor: 'divider',
                                                     '&:hover': { bgcolor: 'background.default' }
                                                 }}
                                             >
-                                                <Typography variant="body2" fontWeight={600}>
-                                                    {type.expenseName}
-                                                </Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {formatCurrency(type.amount)}
-                                                </Typography>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={600}
-                                                    color={entry ? 'error.main' : 'text.secondary'}
-                                                >
+                                                <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>
+                                                <Typography variant="body2" color="text.secondary">{formatCurrency(type.amount)}</Typography>
+                                                <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
                                                     {entry ? formatCurrency(entry.actualAmount) : '—'}
                                                 </Typography>
                                                 <Box display="flex" justifyContent="flex-start" gap={0.5}>
                                                     {!type.isSystemManaged && !entry?.isSystemManaged && (
                                                         <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleOpenExpenseEntry(type)}
-                                                            >
+                                                            <IconButton size="small" onClick={() => handleOpenExpenseEntry(type)}>
                                                                 <EditIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
                                                     {!type.isSystemManaged && !entry?.isSystemManaged && entry && (
                                                         <Tooltip title="Delete entry">
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => handleOpenDeleteExpenseEntry(entry)}
-                                                            >
+                                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteExpenseEntry(entry)}>
                                                                 <DeleteIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
                                                     {(type.isSystemManaged || entry?.isSystemManaged) && (
                                                         <Tooltip title="Auto-updated from transactions">
-                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                                                                Auto
-                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Auto</Typography>
                                                         </Tooltip>
                                                     )}
                                                 </Box>
@@ -821,46 +691,28 @@ const ExpensePage = () => {
                         </Box>
                     </Box>
 
-                    <Divider
-                        orientation="vertical"
-                        flexItem
-                        sx={{ display: { xs: 'none', md: 'block' } }}
-                    />
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
                     <Divider sx={{ display: { xs: 'block', md: 'none' } }} />
 
-                    {/* Right — One-time */}
+                    {/* One-time */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">
                             One-time
                         </Typography>
-                        {/* Search */}
                         <TextField
                             placeholder="Search one-time..."
-                            size="small"
-                            fullWidth
+                            size="small" fullWidth
                             value={oneTimeSearch}
                             onChange={(e) => setOneTimeSearch(e.target.value)}
                             sx={{ mb: 1 }}
                             inputProps={{ style: { fontSize: 13 } }}
                         />
-                        <Box
-                            sx={{
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 2,
-                                overflow: 'hidden'
-                            }}
-                        >
-                            <ListHeader
-                                columns={['Expense', 'Amount', '']}
-                                gridTemplateColumns="2fr 1fr 60px"
-                            />
+                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                            <ListHeader columns={['Expense', 'Amount', '']} gridTemplateColumns="2fr 1fr 60px" />
                             <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
                                 {oneTimeTypes.length === 0 ? (
                                     <Box px={2} py={3}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            No one-time expense types. Add them in Settings.
-                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">No one-time expense types. Add them in Settings.</Typography>
                                     </Box>
                                 ) : (
                                     oneTimeTypes.map((type, index, arr) => {
@@ -871,21 +723,15 @@ const ExpensePage = () => {
                                                 sx={{
                                                     display: 'grid',
                                                     gridTemplateColumns: '2fr 1fr 60px',
-                                                    px: 2,
-                                                    py: 1.5,
+                                                    px: 2, py: 1.5,
                                                     alignItems: 'center',
-                                                    borderBottom: index < arr.length - 1
-                                                        ? '1px solid' : 'none',
+                                                    borderBottom: index < arr.length - 1 ? '1px solid' : 'none',
                                                     borderColor: 'divider',
                                                     '&:hover': { bgcolor: 'background.default' }
                                                 }}
                                             >
-                                                <Typography variant="body2" fontWeight={600}>
-                                                    {type.expenseName}
-                                                </Typography>
-                                                <Typography
-                                                    variant="body2"
-                                                    fontWeight={600}
+                                                <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>
+                                                <Typography variant="body2" fontWeight={600}
                                                     color={entry ? 'error.main' : 'text.secondary'}
                                                     sx={type.isSystemManaged ? { fontStyle: 'italic' } : {}}
                                                 >
@@ -894,30 +740,21 @@ const ExpensePage = () => {
                                                 <Box display="flex" justifyContent="flex-start" gap={0.5}>
                                                     {!type.isSystemManaged && (
                                                         <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => handleOpenExpenseEntry(type)}
-                                                            >
+                                                            <IconButton size="small" onClick={() => handleOpenExpenseEntry(type)}>
                                                                 <EditIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
                                                     {!type.isSystemManaged && entry && (
                                                         <Tooltip title="Delete entry">
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => handleOpenDeleteExpenseEntry(entry)}
-                                                            >
+                                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteExpenseEntry(entry)}>
                                                                 <DeleteIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
                                                     )}
                                                     {type.isSystemManaged && (
                                                         <Tooltip title="Auto-updated from credit card entries">
-                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                                                                Auto
-                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Auto</Typography>
                                                         </Tooltip>
                                                     )}
                                                 </Box>
@@ -930,39 +767,26 @@ const ExpensePage = () => {
                     </Box>
                 </Box>
             </PageCard>
-            
+
             {/* Section 4 — Credit Cards */}
             <PageCard>
                 <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
                     Credit cards — {MONTHS.find(m => m.value === month)?.label} {year}
                 </Typography>
-                <Box
-                    sx={{
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 2,
-                        overflow: 'hidden'
-                    }}
-                >
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
                     {/* Header */}
                     <Box
                         sx={{
                             display: 'grid',
-                            gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 40px',
-                            px: 2,
-                            py: 1.5,
+                            gridTemplateColumns: '56px 2fr 1fr 1fr 1fr 1fr 40px',
+                            px: 2, py: 1.5,
                             bgcolor: 'background.default',
                             borderBottom: '1px solid',
                             borderColor: 'divider'
                         }}
                     >
-                        {['Card', 'Limit', 'Bill', 'Paid', 'Balance', ''].map((col, i) => (
-                            <Typography
-                                key={i}
-                                variant="caption"
-                                color="text.secondary"
-                                fontWeight={600}
-                            >
+                        {['', 'Card', 'Limit', 'Bill', 'Paid', 'Balance', ''].map((col, i) => (
+                            <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>
                                 {col}
                             </Typography>
                         ))}
@@ -984,42 +808,29 @@ const ExpensePage = () => {
                                     onClick={() => handleOpenCreditCardEntry(card)}
                                     sx={{
                                         display: 'grid',
-                                        gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 40px',
-                                        px: 2,
-                                        py: 1.5,
+                                        gridTemplateColumns: '56px 2fr 1fr 1fr 1fr 1fr 40px',
+                                        px: 2, py: 1.5,
                                         alignItems: 'center',
                                         cursor: 'pointer',
-                                        borderBottom: index < creditCards.length - 1
-                                            ? '1px solid' : 'none',
+                                        borderBottom: index < creditCards.length - 1 ? '1px solid' : 'none',
                                         borderColor: 'divider',
                                         '&:hover': { bgcolor: 'action.hover' }
                                     }}
                                 >
-                                    <Typography variant="body2" fontWeight={600}>
-                                        {card.cardName}
-                                    </Typography>
+                                    <Box display="flex" alignItems="center">
+                                        <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />
+                                    </Box>
+                                    <Typography variant="body2" fontWeight={600}>{card.cardName}</Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         {formatCurrency(card.creditLimit)}
                                     </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        fontWeight={600}
-                                        color={entry ? 'error.main' : 'text.secondary'}
-                                    >
+                                    <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
                                         {entry ? formatCurrency(entry.billAmount) : '—'}
                                     </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        fontWeight={600}
-                                        color={entry ? 'success.main' : 'text.secondary'}
-                                    >
+                                    <Typography variant="body2" fontWeight={600} color={entry ? 'success.main' : 'text.secondary'}>
                                         {entry ? formatCurrency(entry.amountPaid) : '—'}
                                     </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        fontWeight={600}
-                                        color={entry?.balance > 0 ? 'error.main' : 'text.secondary'}
-                                    >
+                                    <Typography variant="body2" fontWeight={600} color={entry?.balance > 0 ? 'error.main' : 'text.secondary'}>
                                         {entry ? formatCurrency(entry.balance) : '—'}
                                     </Typography>
                                     <Box display="flex" justifyContent="flex-end">
@@ -1044,12 +855,7 @@ const ExpensePage = () => {
 
             {/* Section 5 — Transactions */}
             <PageCard>
-                <Box
-                    display="flex"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    mb={2}
-                >
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                     <Typography variant="body2" color="text.secondary" fontWeight={600}>
                         Transactions — {MONTHS.find(m => m.value === month)?.label} {year}
                     </Typography>
@@ -1063,58 +869,30 @@ const ExpensePage = () => {
                         Add transaction
                     </Button>
                 </Box>
-
-                {/* Search */}
                 <TextField
                     placeholder="Search transactions..."
-                    size="small"
-                    fullWidth
+                    size="small" fullWidth
                     value={transactionSearch}
                     onChange={(e) => setTransactionSearch(e.target.value)}
                     sx={{ mb: 1.5 }}
                     inputProps={{ style: { fontSize: 13 } }}
                 />
-
-                <Box
-                    sx={{
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 2,
-                        overflow: 'hidden'
-                    }}
-                >
-                    {/* Header */}
+                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
                     <Box
                         sx={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px',
-                            px: 2,
-                            py: 1.5,
+                            px: 2, py: 1.5,
                             bgcolor: 'background.default',
                             borderBottom: '1px solid',
                             borderColor: 'divider'
                         }}
                     >
                         {['Date', 'Expense type', 'Amount', 'Payment', 'Description', ''].map((col, i) => (
-                            <Typography
-                                key={i}
-                                variant="caption"
-                                color="text.secondary"
-                                fontWeight={600}
-                            >
-                                {col}
-                            </Typography>
+                            <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>{col}</Typography>
                         ))}
                     </Box>
-
-                    {/* Rows */}
-                    <Box
-                        sx={{
-                            maxHeight: 280,
-                            overflowY: 'auto',
-                            ...hideScrollbar
-                        }}
-                    >
+                    <Box sx={{ maxHeight: 280, overflowY: 'auto', ...hideScrollbar }}>
                         {filteredTransactions.length === 0 ? (
                             <Box px={2} py={3}>
                                 <Typography variant="body2" color="text.secondary">
@@ -1131,57 +909,32 @@ const ExpensePage = () => {
                                     sx={{
                                         display: 'grid',
                                         gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px',
-                                        px: 2,
-                                        py: 1.5,
+                                        px: 2, py: 1.5,
                                         alignItems: 'center',
-                                        borderBottom: index < filteredTransactions.length - 1
-                                            ? '1px solid' : 'none',
+                                        borderBottom: index < filteredTransactions.length - 1 ? '1px solid' : 'none',
                                         borderColor: 'divider',
                                         '&:hover': { bgcolor: 'background.default' }
                                     }}
                                 >
                                     <Typography variant="body2" color="text.secondary">
-                                        {new Date(transaction.transactionDate)
-                                            .toLocaleDateString('en-CA', {
-                                                month: 'short',
-                                                day: 'numeric'
-                                            })}
+                                        {new Date(transaction.transactionDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
                                     </Typography>
-                                    <Typography variant="body2" fontWeight={600}>
-                                        {transaction.expenseName}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        fontWeight={600}
-                                        color="error.main"
-                                    >
+                                    <Typography variant="body2" fontWeight={600}>{transaction.expenseName}</Typography>
+                                    <Typography variant="body2" fontWeight={600} color="error.main">
                                         {formatCurrency(transaction.amount)}
                                     </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {transaction.paymentMethod}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                        noWrap
-                                    >
+                                    <Typography variant="body2" color="text.secondary">{transaction.paymentMethod}</Typography>
+                                    <Typography variant="body2" color="text.secondary" noWrap>
                                         {transaction.description || '—'}
                                     </Typography>
                                     <Box display="flex" justifyContent="flex-end" gap={0.5}>
                                         <Tooltip title="Edit">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleOpenEditTransaction(transaction)}
-                                            >
+                                            <IconButton size="small" onClick={() => handleOpenEditTransaction(transaction)}>
                                                 <EditIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
                                         <Tooltip title="Delete">
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => handleOpenDeleteTransaction(transaction)}
-                                            >
+                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteTransaction(transaction)}>
                                                 <DeleteIcon fontSize="small" />
                                             </IconButton>
                                         </Tooltip>
@@ -1193,12 +946,11 @@ const ExpensePage = () => {
                 </Box>
             </PageCard>
 
-            {/* ─── Transaction Add/Edit Dialog ─────────────────── */}
+            {/* Transaction Add/Edit Dialog */}
             <Dialog
                 open={transactionDialogOpen}
                 onClose={() => setTransactionDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
+                fullWidth maxWidth="xs"
                 PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
             >
                 <DialogTitle sx={{ fontWeight: 700 }}>
@@ -1207,109 +959,58 @@ const ExpensePage = () => {
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={1}>
                         <TextField
-                            label="Transaction date"
-                            type="date"
+                            label="Transaction date" type="date"
                             value={transactionForm.transactionDate}
-                            onChange={(e) => setTransactionForm({
-                                ...transactionForm,
-                                transactionDate: e.target.value
-                            })}
-                            fullWidth
-                            required
-                            InputLabelProps={{ shrink: true }}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, transactionDate: e.target.value })}
+                            fullWidth required InputLabelProps={{ shrink: true }}
                         />
                         <TextField
-                                select
-                                label="Expense type"
-                                value={transactionForm.expenseTypeId}
-                                onChange={(e) => setTransactionForm({
-                                    ...transactionForm,
-                                    expenseTypeId: e.target.value
-                                })}
-                                fullWidth
-                                required
-                            >
-                                {expenseTypes
-                                    .filter(t => !t.isRecurring)
-                                    .map((type) => (
-                                        <MenuItem key={type.id} value={type.id}>
-                                            {type.expenseName}
-                                        </MenuItem>
-                                    ))
-                                }
-                            </TextField>
+                            select label="Expense type"
+                            value={transactionForm.expenseTypeId}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, expenseTypeId: e.target.value })}
+                            fullWidth required
+                        >
+                            {expenseTypes.filter(t => !t.isRecurring).map((type) => (
+                                <MenuItem key={type.id} value={type.id}>{type.expenseName}</MenuItem>
+                            ))}
+                        </TextField>
                         <TextField
-                            label="Amount"
-                            type="number"
+                            label="Amount" type="number"
                             value={transactionForm.amount}
-                            onChange={(e) => setTransactionForm({
-                                ...transactionForm,
-                                amount: e.target.value
-                            })}
-                            fullWidth
-                            required
-                            inputProps={{ min: 0, step: '0.01' }}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
+                            fullWidth required inputProps={{ min: 0, step: '0.01' }}
                         />
                         <TextField
-                            select
-                            label="Payment method"
+                            select label="Payment method"
                             value={transactionForm.paymentMethodId}
-                            onChange={(e) => setTransactionForm({
-                                ...transactionForm,
-                                paymentMethodId: e.target.value
-                            })}
-                            fullWidth
-                            required
+                            onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethodId: e.target.value })}
+                            fullWidth required
                         >
                             {paymentMethods.map((method) => (
-                                <MenuItem key={method.id} value={method.id}>
-                                    {method.methodName}
-                                </MenuItem>
+                                <MenuItem key={method.id} value={method.id}>{method.methodName}</MenuItem>
                             ))}
                         </TextField>
                         <TextField
                             label="Description"
                             value={transactionForm.description}
-                            onChange={(e) => setTransactionForm({
-                                ...transactionForm,
-                                description: e.target.value
-                            })}
-                            fullWidth
-                            multiline
-                            rows={2}
-                            placeholder="Optional note"
+                            onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
+                            fullWidth multiline rows={2} placeholder="Optional note"
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button onClick={() => setTransactionDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
                     <Button
-                        onClick={() => setTransactionDialogOpen(false)}
-                        variant="outlined"
+                        onClick={handleSaveTransaction} variant="contained"
+                        disabled={savingTransaction || !transactionForm.transactionDate || !transactionForm.expenseTypeId || !transactionForm.amount || !transactionForm.paymentMethodId}
                         sx={{ borderRadius: 2, textTransform: 'none' }}
                     >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSaveTransaction}
-                        variant="contained"
-                        disabled={
-                            savingTransaction ||
-                            !transactionForm.transactionDate ||
-                            !transactionForm.expenseTypeId ||
-                            !transactionForm.amount ||
-                            !transactionForm.paymentMethodId
-                        }
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {savingTransaction
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedTransaction ? 'Save changes' : 'Add'
-                        }
+                        {savingTransaction ? <CircularProgress size={20} color="inherit" /> : selectedTransaction ? 'Save changes' : 'Add'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* ─── Transaction Delete Dialog ───────────────────── */}
+            {/* Transaction Delete Dialog */}
             <Dialog
                 open={transactionDeleteDialogOpen}
                 onClose={() => setTransactionDeleteDialogOpen(false)}
@@ -1324,31 +1025,16 @@ const ExpensePage = () => {
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setTransactionDeleteDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDeleteTransaction}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Remove
-                    </Button>
+                    <Button onClick={() => setTransactionDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button onClick={handleDeleteTransaction} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
                 </DialogActions>
             </Dialog>
 
-
-            {/* ─── Withdrawal Edit Dialog ──────────────────────── */}
+            {/* Withdrawal Edit Dialog */}
             <Dialog
                 open={dialogOpen}
                 onClose={() => setDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
+                fullWidth maxWidth="xs"
                 PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
             >
                 <DialogTitle sx={{ fontWeight: 700 }}>
@@ -1360,43 +1046,26 @@ const ExpensePage = () => {
                             {selectedAccount?.bankName} — {selectedAccount?.accountType}
                         </Typography>
                         <TextField
-                            label="Withdrawal"
-                            type="number"
+                            label="Withdrawal" type="number"
                             value={form.withdrawal}
                             onChange={(e) => setForm({ withdrawal: e.target.value })}
-                            fullWidth
-                            inputProps={{ min: 0, step: '0.01' }}
+                            fullWidth inputProps={{ min: 0, step: '0.01' }}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSave}
-                        variant="contained"
-                        disabled={saving || form.withdrawal === ''}
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {saving
-                            ? <CircularProgress size={20} color="inherit" />
-                            : 'Save'
-                        }
+                    <Button onClick={() => setDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button onClick={handleSave} variant="contained" disabled={saving || form.withdrawal === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
+                        {saving ? <CircularProgress size={20} color="inherit" /> : 'Save'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* ─── Expense Entry Add/Edit Dialog ──────────────── */}
+            {/* Expense Entry Add/Edit Dialog */}
             <Dialog
                 open={expenseDialogOpen}
                 onClose={() => setExpenseDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
+                fullWidth maxWidth="xs"
                 PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
             >
                 <DialogTitle sx={{ fontWeight: 700 }}>
@@ -1408,39 +1077,22 @@ const ExpensePage = () => {
                             {selectedExpenseType?.expenseName} — {MONTHS.find(m => m.value === month)?.label} {year}
                         </Typography>
                         <TextField
-                            label="Amount"
-                            type="number"
+                            label="Amount" type="number"
                             value={expenseForm.actualAmount}
                             onChange={(e) => setExpenseForm({ actualAmount: e.target.value })}
-                            fullWidth
-                            required
-                            inputProps={{ min: 0, step: '0.01' }}
+                            fullWidth required inputProps={{ min: 0, step: '0.01' }}
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setExpenseDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSaveExpenseEntry}
-                        variant="contained"
-                        disabled={savingExpense || expenseForm.actualAmount === ''}
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {savingExpense
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedEntry ? 'Save changes' : 'Add'
-                        }
+                    <Button onClick={() => setExpenseDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button onClick={handleSaveExpenseEntry} variant="contained" disabled={savingExpense || expenseForm.actualAmount === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
+                        {savingExpense ? <CircularProgress size={20} color="inherit" /> : selectedEntry ? 'Save changes' : 'Add'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* ─── Expense Entry Delete Dialog ─────────────────── */}
+            {/* Expense Entry Delete Dialog */}
             <Dialog
                 open={expenseEntryDeleteDialogOpen}
                 onClose={() => setExpenseEntryDeleteDialogOpen(false)}
@@ -1454,21 +1106,8 @@ const ExpensePage = () => {
                     </Typography>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setExpenseEntryDeleteDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDeleteExpenseEntry}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Remove
-                    </Button>
+                    <Button onClick={() => setExpenseEntryDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button onClick={handleDeleteExpenseEntry} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
                 </DialogActions>
             </Dialog>
 
@@ -1476,8 +1115,7 @@ const ExpensePage = () => {
             <Dialog
                 open={creditCardDialogOpen}
                 onClose={() => setCreditCardDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
+                fullWidth maxWidth="xs"
                 PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
             >
                 <DialogTitle sx={{ fontWeight: 700 }}>
@@ -1485,47 +1123,35 @@ const ExpensePage = () => {
                 </DialogTitle>
                 <DialogContent>
                     <Box mt={1} display="flex" flexDirection="column" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                            {selectedCreditCard?.cardName} — {MONTHS.find(m => m.value === month)?.label} {year}
-                        </Typography>
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                            <CreditCardIcon color={selectedCreditCard?.cardColor || '#f44336'} size="md" />
+                            <Typography variant="body2" color="text.secondary">
+                                {selectedCreditCard?.cardName} — {MONTHS.find(m => m.value === month)?.label} {year}
+                            </Typography>
+                        </Box>
                         <TextField
-                            label="Bill amount"
-                            type="number"
+                            label="Bill amount" type="number"
                             value={creditCardForm.billAmount}
                             onChange={(e) => setCreditCardForm({ ...creditCardForm, billAmount: e.target.value })}
-                            fullWidth
-                            required
-                            inputProps={{ min: 0, step: '0.01' }}
+                            fullWidth required inputProps={{ min: 0, step: '0.01' }}
                         />
                         <TextField
-                            label="Amount paid"
-                            type="number"
+                            label="Amount paid" type="number"
                             value={creditCardForm.amountPaid}
                             onChange={(e) => setCreditCardForm({ ...creditCardForm, amountPaid: e.target.value })}
-                            fullWidth
-                            inputProps={{ min: 0, step: '0.01' }}
+                            fullWidth inputProps={{ min: 0, step: '0.01' }}
                             helperText="Leave as 0 if not yet paid"
                         />
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                    <Button onClick={() => setCreditCardDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
                     <Button
-                        onClick={() => setCreditCardDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSaveCreditCardEntry}
-                        variant="contained"
+                        onClick={handleSaveCreditCardEntry} variant="contained"
                         disabled={savingCreditCard || creditCardForm.billAmount === ''}
                         sx={{ borderRadius: 2, textTransform: 'none' }}
                     >
-                        {savingCreditCard
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedCreditCardEntry ? 'Save changes' : 'Add'
-                        }
+                        {savingCreditCard ? <CircularProgress size={20} color="inherit" /> : selectedCreditCardEntry ? 'Save changes' : 'Add'}
                     </Button>
                 </DialogActions>
             </Dialog>

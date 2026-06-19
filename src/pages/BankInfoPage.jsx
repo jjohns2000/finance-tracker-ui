@@ -14,6 +14,7 @@ import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import PageCard from '../components/PageCard';
 import SectionHeader from '../pages/SectionHeader';
+import CreditCardIcon from '../components/CreditCardIcon';
 import {
     Box,
     Typography,
@@ -32,8 +33,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import {
     getUserCreditCards,
     createCreditCard,
@@ -41,10 +40,31 @@ import {
     deleteCreditCard
 } from '../api/creditCardApi';
 
+const CARD_COLORS = [
+    '#f44336',
+    '#e91e63',
+    '#9c27b0',
+    '#3f51b5',
+    '#115293',
+    '#0097a7',
+    '#388e3c',
+    '#f57c00',
+    '#5d4037',
+    '#455a64',
+    '#f5f5f0',
+];
+
 const emptyForm = {
     bankId: '',
     accountTypeId: '',
     openingBalance: ''
+};
+
+const emptyCreditCardForm = {
+    cardName: '',
+    creditLimit: '',
+    startDate: '',
+    cardColor: '#f44336'
 };
 
 const BankInfoPage = () => {
@@ -65,11 +85,7 @@ const BankInfoPage = () => {
     const [creditCardDialogOpen, setCreditCardDialogOpen] = useState(false);
     const [creditCardDeleteDialogOpen, setCreditCardDeleteDialogOpen] = useState(false);
     const [selectedCreditCard, setSelectedCreditCard] = useState(null);
-    const [creditCardForm, setCreditCardForm] = useState({
-        cardName: '',
-        creditLimit: '',
-        startDate: ''
-    });
+    const [creditCardForm, setCreditCardForm] = useState(emptyCreditCardForm);
     const [savingCreditCard, setSavingCreditCard] = useState(false);
 
     const fetchAll = async () => {
@@ -99,72 +115,11 @@ const BankInfoPage = () => {
         fetchAll();
     }, []);
 
+    // ─── Account handlers ─────────────────────────────────────────────
     const handleOpenAdd = () => {
         setSelectedAccount(null);
         setForm(emptyForm);
         setDialogOpen(true);
-    };
-
-    const handleOpenAddCreditCard = () => {
-    setSelectedCreditCard(null);
-    setCreditCardForm({ cardName: '', creditLimit: '', startDate: '' });
-    setCreditCardDialogOpen(true);
-};
-
-    const handleOpenEditCreditCard = (card) => {
-        setSelectedCreditCard(card);
-        setCreditCardForm({
-            cardName: card.cardName,
-            creditLimit: card.creditLimit,
-            startDate: card.startDate
-                ? new Date(card.startDate).toISOString().split('T')[0]
-                : ''
-        });
-        setCreditCardDialogOpen(true);
-    };
-
-    const handleOpenDeleteCreditCard = (card) => {
-        setSelectedCreditCard(card);
-        setCreditCardDeleteDialogOpen(true);
-    };
-
-    const handleSaveCreditCard = async () => {
-        setSavingCreditCard(true);
-        try {
-            if (selectedCreditCard) {
-                await updateCreditCard({
-                    publicId: selectedCreditCard.publicId,
-                    cardName: creditCardForm.cardName,
-                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
-                    startDate: creditCardForm.startDate
-                });
-                showSnackbar('Credit card updated successfully.', 'success');
-            } else {
-                await createCreditCard({
-                    cardName: creditCardForm.cardName,
-                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
-                    startDate: creditCardForm.startDate
-                });
-                showSnackbar('Credit card added successfully.', 'success');
-            }
-            await fetchAll();
-            setCreditCardDialogOpen(false);
-        } catch (err) {
-            showSnackbar('Something went wrong. Please try again.', 'error');
-        } finally {
-            setSavingCreditCard(false);
-        }
-    };
-
-    const handleDeleteCreditCard = async () => {
-        try {
-            await deleteCreditCard(selectedCreditCard.publicId);
-            showSnackbar('Credit card removed successfully.', 'info');
-            await fetchAll();
-            setCreditCardDeleteDialogOpen(false);
-        } catch (err) {
-            showSnackbar('Failed to remove credit card.', 'error');
-        }
     };
 
     const handleOpenEdit = (account) => {
@@ -223,6 +178,72 @@ const BankInfoPage = () => {
         }
     };
 
+    // ─── Credit card handlers ─────────────────────────────────────────
+    const handleOpenAddCreditCard = () => {
+        setSelectedCreditCard(null);
+        setCreditCardForm(emptyCreditCardForm);
+        setCreditCardDialogOpen(true);
+    };
+
+    const handleOpenEditCreditCard = (card) => {
+        setSelectedCreditCard(card);
+        setCreditCardForm({
+            cardName: card.cardName,
+            creditLimit: card.creditLimit,
+            startDate: card.startDate
+                ? new Date(card.startDate).toISOString().split('T')[0]
+                : '',
+            cardColor: card.cardColor || '#f44336'
+        });
+        setCreditCardDialogOpen(true);
+    };
+
+    const handleOpenDeleteCreditCard = (card) => {
+        setSelectedCreditCard(card);
+        setCreditCardDeleteDialogOpen(true);
+    };
+
+    const handleSaveCreditCard = async () => {
+        setSavingCreditCard(true);
+        try {
+            if (selectedCreditCard) {
+                await updateCreditCard({
+                    publicId: selectedCreditCard.publicId,
+                    cardName: creditCardForm.cardName,
+                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
+                    startDate: creditCardForm.startDate,
+                    cardColor: creditCardForm.cardColor
+                });
+                showSnackbar('Credit card updated successfully.', 'success');
+            } else {
+                await createCreditCard({
+                    cardName: creditCardForm.cardName,
+                    creditLimit: parseFloat(creditCardForm.creditLimit) || 0,
+                    startDate: creditCardForm.startDate,
+                    cardColor: creditCardForm.cardColor
+                });
+                showSnackbar('Credit card added successfully.', 'success');
+            }
+            await fetchAll();
+            setCreditCardDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Something went wrong. Please try again.', 'error');
+        } finally {
+            setSavingCreditCard(false);
+        }
+    };
+
+    const handleDeleteCreditCard = async () => {
+        try {
+            await deleteCreditCard(selectedCreditCard.publicId);
+            showSnackbar('Credit card removed successfully.', 'info');
+            await fetchAll();
+            setCreditCardDeleteDialogOpen(false);
+        } catch (err) {
+            showSnackbar('Failed to remove credit card.', 'error');
+        }
+    };
+
     const formatCurrency = (value) =>
         `$${(value ?? 0).toLocaleString('en-CA', {
             minimumFractionDigits: 2,
@@ -240,7 +261,7 @@ const BankInfoPage = () => {
                 />
             </PageCard>
 
-            {/* Section 1 — Account CRUD */}
+            {/* Section 1 — Accounts */}
             <PageCard>
                 <SectionHeader
                     title="Accounts"
@@ -257,7 +278,6 @@ const BankInfoPage = () => {
                         </Button>
                     }
                 />
-
                 {loading ? (
                     <Box display="flex" justifyContent="center" py={4}>
                         <CircularProgress size={24} />
@@ -297,10 +317,10 @@ const BankInfoPage = () => {
                             >
                                 <Box display="flex" alignItems="center" gap={2}>
                                     <Box>
-                                        <Typography variant="body2" fontWeight={600} align='left' display='block'>
+                                        <Typography variant="body2" fontWeight={600} display="block">
                                             {account.bankName}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary" align='left' display='block'>
+                                        <Typography variant="caption" color="text.secondary" display="block">
                                             Opening balance: {formatCurrency(account.openingBalance)}
                                         </Typography>
                                     </Box>
@@ -312,19 +332,12 @@ const BankInfoPage = () => {
                                 </Box>
                                 <Box display="flex" gap={1}>
                                     <Tooltip title="Edit">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleOpenEdit(account)}
-                                        >
+                                        <IconButton size="small" onClick={() => handleOpenEdit(account)}>
                                             <EditIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Delete">
-                                        <IconButton
-                                            size="small"
-                                            color="error"
-                                            onClick={() => handleOpenDelete(account)}
-                                        >
+                                        <IconButton size="small" color="error" onClick={() => handleOpenDelete(account)}>
                                             <DeleteIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
@@ -352,7 +365,6 @@ const BankInfoPage = () => {
                         </Button>
                     }
                 />
-
                 {loading ? (
                     <Box display="flex" justifyContent="center" py={4}>
                         <CircularProgress size={24} />
@@ -370,7 +382,7 @@ const BankInfoPage = () => {
                             borderColor: 'divider',
                             borderRadius: 2,
                             overflow: 'hidden',
-                            maxHeight: 260,
+                            maxHeight: 300,
                             overflowY: 'auto'
                         }}
                     >
@@ -378,7 +390,7 @@ const BankInfoPage = () => {
                         <Box
                             sx={{
                                 display: 'grid',
-                                gridTemplateColumns: '2fr 1fr 1fr 80px',
+                                gridTemplateColumns: '56px 2fr 1fr 1fr 80px',
                                 px: 2,
                                 py: 1.5,
                                 bgcolor: 'background.default',
@@ -386,7 +398,7 @@ const BankInfoPage = () => {
                                 borderColor: 'divider'
                             }}
                         >
-                            {['Card name', 'Limit', 'Since', ''].map((col, i) => (
+                            {['', 'Card name', 'Limit', 'Since', ''].map((col, i) => (
                                 <Typography
                                     key={i}
                                     variant="caption"
@@ -404,7 +416,7 @@ const BankInfoPage = () => {
                                 key={card.publicId}
                                 sx={{
                                     display: 'grid',
-                                    gridTemplateColumns: '2fr 1fr 1fr 80px',
+                                    gridTemplateColumns: '56px 2fr 1fr 1fr 80px',
                                     px: 2,
                                     py: 1.5,
                                     alignItems: 'center',
@@ -414,6 +426,12 @@ const BankInfoPage = () => {
                                     '&:hover': { bgcolor: 'background.default' }
                                 }}
                             >
+                                <Box display="flex" alignItems="center">
+                                    <CreditCardIcon
+                                        color={card.cardColor || '#f44336'}
+                                        size="sm"
+                                    />
+                                </Box>
                                 <Typography variant="body2" fontWeight={600}>
                                     {card.cardName}
                                 </Typography>
@@ -428,19 +446,12 @@ const BankInfoPage = () => {
                                 </Typography>
                                 <Box display="flex" justifyContent="flex-end" gap={0.5}>
                                     <Tooltip title="Edit">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => handleOpenEditCreditCard(card)}
-                                        >
+                                        <IconButton size="small" onClick={() => handleOpenEditCreditCard(card)}>
                                             <EditIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Delete">
-                                        <IconButton
-                                            size="small"
-                                            color="error"
-                                            onClick={() => handleOpenDeleteCreditCard(card)}
-                                        >
+                                        <IconButton size="small" color="error" onClick={() => handleOpenDeleteCreditCard(card)}>
                                             <DeleteIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
@@ -474,8 +485,7 @@ const BankInfoPage = () => {
                             py: 1.5,
                             bgcolor: 'background.default',
                             borderBottom: '1px solid',
-                            borderColor: 'divider',
-                            alignContent: 'center'
+                            borderColor: 'divider'
                         }}
                     >
                         {[
@@ -521,71 +531,35 @@ const BankInfoPage = () => {
                                     py: 1.5,
                                     alignItems: 'center',
                                     borderBottom: index < runningTotals.length - 1
-                                        ? '1px solid'
-                                        : 'none',
+                                        ? '1px solid' : 'none',
                                     borderColor: 'divider',
-                                    '&:hover': {
-                                        bgcolor: 'background.default'
-                                    }
+                                    '&:hover': { bgcolor: 'background.default' }
                                 }}
                             >
                                 <Box>
-                                    <Typography variant="body2" fontWeight={600} align='left' display='block'>
+                                    <Typography variant="body2" fontWeight={600} display="block">
                                         {account.bankName}
                                     </Typography>
-                                    <Typography variant="caption" color="text.secondary" align='left' display='block'>
+                                    <Typography variant="caption" color="text.secondary" display="block">
                                         {account.accountType}
                                     </Typography>
                                 </Box>
-                                <Typography variant="body2" textAlign="right" align='left' display='block'>
+                                <Typography variant="body2" textAlign="right">
                                     {formatCurrency(account.initialOpeningBalance)}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    textAlign="right"
-                                    color="success.main"
-                                    fontWeight={600}
-                                    align='left'
-                                    display='block'
-                                >
+                                <Typography variant="body2" textAlign="right" color="success.main" fontWeight={600}>
                                     {formatCurrency(account.totalDeposits)}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    textAlign="right"
-                                    color="success.main"
-                                    fontWeight={600}
-                                    align='left'
-                                    display='block'
-                                >
+                                <Typography variant="body2" textAlign="right" color="success.main" fontWeight={600}>
                                     {formatCurrency(account.totalInterest)}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    textAlign="right"
-                                    color="error.main"
-                                    fontWeight={600}
-                                    align='left'
-                                    display='block'
-                                >
+                                <Typography variant="body2" textAlign="right" color="error.main" fontWeight={600}>
                                     {formatCurrency(account.totalWithdrawals)}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    textAlign="right"
-                                    fontWeight={600}
-                                    align='left'
-                                    display='block'
-                                >
+                                <Typography variant="body2" textAlign="right" fontWeight={600}>
                                     {formatCurrency(account.currentBalance)}
                                 </Typography>
-                                <Typography
-                                    variant="body2"
-                                    textAlign="right"
-                                    color="text.secondary"
-                                    align='left'
-                                    display='block'
-                                >
+                                <Typography variant="body2" textAlign="right" color="text.secondary">
                                     {account.monthsTracked}{' '}
                                     {account.monthsTracked === 1 ? 'month' : 'months'}
                                 </Typography>
@@ -595,7 +569,7 @@ const BankInfoPage = () => {
                 </Box>
             </PageCard>
 
-            {/* Add / Edit Dialog */}
+            {/* Add / Edit Account Dialog */}
             <Dialog
                 open={dialogOpen}
                 onClose={() => setDialogOpen(false)}
@@ -658,12 +632,7 @@ const BankInfoPage = () => {
                     <Button
                         onClick={handleSave}
                         variant="contained"
-                        disabled={
-                            saving ||
-                            !form.bankId ||
-                            !form.accountTypeId ||
-                            form.openingBalance === ''
-                        }
+                        disabled={saving || !form.bankId || !form.accountTypeId || form.openingBalance === ''}
                         sx={{ borderRadius: 2, textTransform: 'none' }}
                     >
                         {saving
@@ -674,15 +643,13 @@ const BankInfoPage = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
+            {/* Delete Account Dialog */}
             <Dialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
                 PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    Remove account
-                </DialogTitle>
+                <DialogTitle sx={{ fontWeight: 700 }}>Remove account</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary">
                         Are you sure you want to remove{' '}
@@ -711,7 +678,7 @@ const BankInfoPage = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Credit Card Add/Edit Dialog */}
+            {/* Add / Edit Credit Card Dialog */}
             <Dialog
                 open={creditCardDialogOpen}
                 onClose={() => setCreditCardDialogOpen(false)}
@@ -749,6 +716,44 @@ const BankInfoPage = () => {
                             required
                             InputLabelProps={{ shrink: true }}
                         />
+
+                        {/* Color picker */}
+                        <Box>
+                            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                                Card color
+                            </Typography>
+                            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+                                {CARD_COLORS.map((color) => (
+                                    <Box
+                                        key={color}
+                                        onClick={() => setCreditCardForm({ ...creditCardForm, cardColor: color })}
+                                        sx={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: 1.5,
+                                            bgcolor: color,
+                                            cursor: 'pointer',
+                                            border: creditCardForm.cardColor === color
+                                                ? '3px solid white'
+                                                : '3px solid transparent',
+                                            outline: creditCardForm.cardColor === color
+                                                ? `2px solid ${color}`
+                                                : 'none',
+                                            transition: 'transform 0.1s ease',
+                                            '&:hover': { transform: 'scale(1.15)' }
+                                        }}
+                                    />
+                                ))}
+                            </Box>
+                        </Box>
+
+                        {/* Preview */}
+                        <Box display="flex" alignItems="center" gap={1.5}>
+                            <CreditCardIcon color={creditCardForm.cardColor} size="md" />
+                            <Typography variant="caption" color="text.secondary">
+                                Preview
+                            </Typography>
+                        </Box>
                     </Box>
                 </DialogContent>
                 <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
@@ -778,7 +783,7 @@ const BankInfoPage = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Credit Card Delete Dialog */}
+            {/* Delete Credit Card Dialog */}
             <Dialog
                 open={creditCardDeleteDialogOpen}
                 onClose={() => setCreditCardDeleteDialogOpen(false)}

@@ -186,7 +186,7 @@ const Sidebar = ({ navItems = [] }) => {
                 }}
             >
                 {(forceExpanded || !collapsed) && (
-                    <Typography variant="subtitle1" fontWeight={700} noWrap>
+                    <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1, textAlign: 'center' }}>
                         FinanceTracker
                     </Typography>
                 )}
