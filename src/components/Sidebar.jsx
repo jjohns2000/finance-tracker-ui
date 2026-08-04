@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSnackbar } from '../context/SnackbarContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSidebar } from '../context/SidebarContext';
+import { useNav } from '../context/NavContext';
 import {
     Box,
     IconButton,
@@ -32,6 +33,10 @@ import MenuIcon from '@mui/icons-material/Menu';
 
 const SIDEBAR_EXPANDED = 240;
 const SIDEBAR_COLLAPSED = 68;
+const ITEM_INSET = 12;
+const ITEM_WIDTH_EXPANDED = SIDEBAR_EXPANDED - ITEM_INSET * 2;
+const ITEM_WIDTH_COLLAPSED = SIDEBAR_COLLAPSED - ITEM_INSET * 2;
+const SIDEBAR_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 const iconMap = {
     Dashboard: DashboardIcon,
@@ -42,13 +47,14 @@ const iconMap = {
     Settings: SettingsIcon
 };
 
-const Sidebar = ({ navItems = [] }) => {
+const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { logout } = useAuth();
     const { showSnackbar } = useSnackbar();
     const { mode, toggleTheme } = useTheme();
     const { collapsed, toggleCollapsed } = useSidebar();
+    const { navItems } = useNav();
     const muiTheme = useMuiTheme();
     const isDark = muiTheme.palette.mode === 'dark';
     const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -64,10 +70,9 @@ const Sidebar = ({ navItems = [] }) => {
 
     const sidebarWidth = collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED;
 
-    const sidebarBg   = isDark ? '#1a1a1a' : '#ffffff';
     const activeBg    = '#115293';
-    const hoverBg     = isDark ? '#2b2b2b' : '#f5f5f5';
-    const pageBg      = isDark ? '#0a0a0a' : '#f0f2f5';
+    const itemBg      = isDark ? '#1c1c1c' : '#eef0f2';
+    const hoverBg     = isDark ? '#2b2b2b' : '#e2e5e8';
 
     const NavItem = ({ item, forceExpanded = false }) => {
         const IconComponent = iconMap[item.icon] || DashboardIcon;
@@ -85,15 +90,18 @@ const Sidebar = ({ navItems = [] }) => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
-                        px: isCollapsed ? 0 : 2,
-                        py: 1.2,
-                        mx: 1,
-                        mb: 0.5,
-                        borderRadius: 2.5,
+                        px: isCollapsed ? 0 : 2.5,
+                        py: 1.3,
+                        mx: 1.5,
+                        mb: 1,
+                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : ITEM_WIDTH_EXPANDED,
+                        height: 44,
+                        overflow: 'hidden',
+                        borderRadius: '999px',
                         cursor: 'pointer',
                         justifyContent: isCollapsed ? 'center' : 'flex-start',
-                        bgcolor: isActive ? activeBg : 'transparent',
-                        transition: 'background 0.15s ease',
+                        bgcolor: isActive ? activeBg : itemBg,
+                        transition: `width 0.28s ${SIDEBAR_EASE}, padding 0.28s ${SIDEBAR_EASE}, background-color 0.15s ease`,
                         '&:hover': {
                             bgcolor: isActive ? activeBg : hoverBg
                         }
@@ -113,7 +121,7 @@ const Sidebar = ({ navItems = [] }) => {
                     {!isCollapsed && (
                         <Typography
                             variant="body2"
-                            fontWeight={isActive ? 600 : 400}
+                            fontWeight={isActive ? 700 : 600}
                             noWrap
                             sx={{ color: isActive ? '#fff' : 'text.primary' }}
                         >
@@ -135,17 +143,21 @@ const Sidebar = ({ navItems = [] }) => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
-                        px: isCollapsed ? 0 : 2,
-                        py: 1.2,
-                        mx: 1,
-                        mb: 0.5,
-                        borderRadius: 2.5,
+                        px: isCollapsed ? 0 : 2.5,
+                        py: 1.3,
+                        mx: 1.5,
+                        mb: 1,
+                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : ITEM_WIDTH_EXPANDED,
+                        height: 44,
+                        overflow: 'hidden',
+                        borderRadius: '999px',
                         cursor: 'pointer',
                         justifyContent: isCollapsed ? 'center' : 'flex-start',
-                        transition: 'background 0.15s ease',
+                        bgcolor: itemBg,
+                        transition: `width 0.28s ${SIDEBAR_EASE}, padding 0.28s ${SIDEBAR_EASE}, background-color 0.15s ease`,
                         '&:hover': {
                             bgcolor: color
-                                ? isDark ? 'rgba(244,67,54,0.1)' : 'rgba(244,67,54,0.07)'
+                                ? isDark ? 'rgba(244,67,54,0.15)' : 'rgba(244,67,54,0.1)'
                                 : hoverBg
                         }
                     }}
@@ -154,7 +166,7 @@ const Sidebar = ({ navItems = [] }) => {
                         {icon}
                     </Box>
                     {!isCollapsed && (
-                        <Typography variant="body2" fontWeight={400} noWrap sx={{ color: color || 'text.secondary' }}>
+                        <Typography variant="body2" fontWeight={600} noWrap sx={{ color: color || 'text.primary' }}>
                             {label}
                         </Typography>
                     )}
@@ -170,6 +182,7 @@ const Sidebar = ({ navItems = [] }) => {
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
+                justifyContent: 'center',
                 overflow: 'hidden'
             }}
         >
@@ -179,7 +192,8 @@ const Sidebar = ({ navItems = [] }) => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: (!forceExpanded && collapsed) ? 'center' : 'space-between',
-                    px: (!forceExpanded && collapsed) ? 1 : 2,
+                    gap: 1,
+                    px: 1.5,
                     py: 2,
                     minHeight: 60,
                     flexShrink: 0
@@ -187,12 +201,16 @@ const Sidebar = ({ navItems = [] }) => {
             >
                 {(forceExpanded || !collapsed) && (
                     <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1, textAlign: 'center' }}>
-                        FinanceTracker
+                        Finance Tracker
                     </Typography>
                 )}
                 {!forceExpanded && (
                     <Tooltip title={collapsed ? 'Expand' : 'Collapse'} placement="right">
-                        <IconButton onClick={toggleCollapsed} size="small">
+                        <IconButton
+                            onClick={toggleCollapsed}
+                            size="small"
+                            sx={{ bgcolor: itemBg, width: 40, height: 40, flexShrink: 0, '&:hover': { bgcolor: hoverBg } }}
+                        >
                             {collapsed
                                 ? <ChevronRightIcon fontSize="small" />
                                 : <ChevronLeftIcon fontSize="small" />
@@ -201,21 +219,27 @@ const Sidebar = ({ navItems = [] }) => {
                     </Tooltip>
                 )}
                 {forceExpanded && (
-                    <IconButton onClick={() => setMobileOpen(false)} size="small">
+                    <IconButton
+                        onClick={() => setMobileOpen(false)}
+                        size="small"
+                        sx={{ bgcolor: itemBg, width: 40, height: 40, flexShrink: 0, '&:hover': { bgcolor: hoverBg } }}
+                    >
                         <ChevronLeftIcon fontSize="small" />
                     </IconButton>
                 )}
             </Box>
 
+            <Box sx={{ height: '1px', bgcolor: 'divider', mx: 2, mb: 1 }} />
+
             {/* Nav items */}
-            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 0.5 }}>
+            <Box sx={{ flexShrink: 0, overflowY: 'auto', overflowX: 'hidden', py: 0.5 }}>
                 {navItems.map((item) => (
                     <NavItem key={item.id} item={item} forceExpanded={forceExpanded} />
                 ))}
             </Box>
 
             {/* Bottom — theme + logout */}
-            <Box sx={{ pb: 2, flexShrink: 0 }}>
+            <Box sx={{ pt: 1, pb: 2, flexShrink: 0 }}>
                 <Box sx={{ height: '1px', bgcolor: 'divider', mx: 2, mb: 1.5 }} />
                 <BottomItem
                     icon={mode === 'light'
@@ -291,9 +315,7 @@ const Sidebar = ({ navItems = [] }) => {
                     zIndex: 1300,
                     transition: 'left 0.25s ease',
                     width: 'calc(100vw - 24px)',
-                    bgcolor: sidebarBg,
-                    borderRadius: 4,
-                    boxShadow: 6,
+                    bgcolor: 'background.default',
                     overflow: 'hidden'
                 }}
             >
@@ -310,7 +332,7 @@ const Sidebar = ({ navItems = [] }) => {
                     height: '100vh',
                     width: sidebarWidth + 24,
                     flexShrink: 0,
-                    transition: 'width 0.2s ease',
+                    transition: `width 0.28s ${SIDEBAR_EASE}`,
                     alignSelf: 'flex-start',
                     p: 1.5
                 }}
@@ -318,8 +340,6 @@ const Sidebar = ({ navItems = [] }) => {
                 <Box
                     sx={{
                         height: '100%',
-                        bgcolor: sidebarBg,
-                        borderRadius: 4,
                         overflow: 'hidden',
                         display: 'flex',
                         flexDirection: 'column'

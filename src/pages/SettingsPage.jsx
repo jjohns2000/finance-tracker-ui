@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getNavItems } from '../api/navApi';
 import {
     getExpenseTypes,
     createExpenseType,
@@ -43,7 +42,6 @@ const emptyForm = {
 
 const SettingsPage = () => {
     const { showSnackbar } = useSnackbar();
-    const [navItems, setNavItems] = useState([]);
     const [expenseTypes, setExpenseTypes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -55,11 +53,7 @@ const SettingsPage = () => {
 
     const fetchAll = async () => {
         try {
-            const [nav, types] = await Promise.all([
-                getNavItems(),
-                getExpenseTypes()
-            ]);
-            setNavItems(nav);
+            const types = await getExpenseTypes();
             setExpenseTypes(types);
         } catch (err) {
             console.error('Failed to load settings', err);
@@ -191,7 +185,7 @@ const SettingsPage = () => {
     });
 
     return (
-        <PageLayout sidebar={<Sidebar navItems={navItems} />}>
+        <PageLayout sidebar={<Sidebar />}>
 
             {/* Page Header */}
             <PageCard>

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getNavItems } from '../api/navApi';
 import {
     getKpiData,
     getMonthlyTrend,
@@ -102,7 +101,6 @@ const DashboardPage = () => {
     const theme     = useTheme();
     const isDark    = theme.palette.mode === 'dark';
 
-    const [navItems, setNavItems]             = useState([]);
     const [kpis, setKpis]                     = useState([]);
     const [trendData, setTrendData]           = useState([]);
     const [incomePie, setIncomePie]           = useState([]);
@@ -177,14 +175,6 @@ const DashboardPage = () => {
             setChartsLoading(false);
         }
     };
-
-    useEffect(() => {
-        const fetchNav = async () => {
-            try { setNavItems(await getNavItems()); }
-            catch (err) { console.error('Failed to load nav', err); }
-        };
-        fetchNav();
-    }, []);
 
     useEffect(() => { fetchDashboardData(); }, [month, year]);
 
@@ -294,7 +284,7 @@ const DashboardPage = () => {
     };
 
     return (
-        <PageLayout sidebar={<Sidebar navItems={navItems} />}>
+        <PageLayout sidebar={<Sidebar />}>
 
             {/* Section 1 — Title + Date Picker + Quick Actions */}
             <PageCard>

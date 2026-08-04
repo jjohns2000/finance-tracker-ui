@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getNavItems } from '../api/navApi';
 import { getUserAccounts } from '../api/settingsApi';
 import {
     getMonthlyAccountSummary,
@@ -65,7 +64,6 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
 const IncomePage = () => {
     const { showSnackbar } = useSnackbar();
-    const [navItems, setNavItems]     = useState([]);
     const [accounts, setAccounts]     = useState([]);
     const [summary, setSummary]       = useState([]);
     const [aggregate, setAggregate]   = useState(null);
@@ -130,13 +128,11 @@ const IncomePage = () => {
     useEffect(() => {
         const init = async () => {
             try {
-                const [nav, accs, types, freqs] = await Promise.all([
-                    getNavItems(),
+                const [accs, types, freqs] = await Promise.all([
                     getUserAccounts(),
                     getEmploymentTypes(),
                     getPayFrequencies()
                 ]);
-                setNavItems(nav);
                 setAccounts(accs);
                 setEmploymentTypes(types);
                 setPayFrequencies(freqs);
@@ -329,7 +325,7 @@ const IncomePage = () => {
     );
 
     return (
-        <PageLayout sidebar={<Sidebar navItems={navItems} />}>
+        <PageLayout sidebar={<Sidebar />}>
 
             {/* Section 1 — Title + Date Picker */}
             <PageCard sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 2, sm: 0 } }}>

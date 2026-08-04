@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getNavItems } from '../api/navApi';
 import {
     getBanks,
     getAccountTypes,
@@ -69,7 +68,6 @@ const emptyCreditCardForm = {
 
 const BankInfoPage = () => {
     const { showSnackbar } = useSnackbar();
-    const [navItems, setNavItems] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [banks, setBanks] = useState([]);
     const [accountTypes, setAccountTypes] = useState([]);
@@ -90,15 +88,13 @@ const BankInfoPage = () => {
 
     const fetchAll = async () => {
         try {
-            const [nav, accs, bnks, types, totals, cards] = await Promise.all([
-                getNavItems(),
+            const [accs, bnks, types, totals, cards] = await Promise.all([
                 getUserAccounts(),
                 getBanks(),
                 getAccountTypes(),
                 getAccountRunningTotals(),
                 getUserCreditCards()
             ]);
-            setNavItems(nav);
             setAccounts(accs);
             setBanks(bnks);
             setAccountTypes(types);
@@ -251,7 +247,7 @@ const BankInfoPage = () => {
         })}`;
 
     return (
-        <PageLayout sidebar={<Sidebar navItems={navItems} />}>
+        <PageLayout sidebar={<Sidebar />}>
 
             {/* Page Header */}
             <PageCard>
