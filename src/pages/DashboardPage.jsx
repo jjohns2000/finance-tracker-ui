@@ -178,6 +178,13 @@ const DashboardPage = () => {
 
     useEffect(() => { fetchDashboardData(); }, [month, year]);
 
+    const last6Trend = trendData.slice(-6);
+    const kpiSparklines = [
+        last6Trend.map(t => ({ v: t.Income })),
+        last6Trend.map(t => ({ v: t.Expense })),
+        last6Trend.map(t => ({ v: t.Income - t.Expense }))
+    ];
+
     const formatCurrency = (value) =>
         `$${(value ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -221,16 +228,14 @@ const DashboardPage = () => {
             { label: 'Q4', months: [9, 10, 11] }
         ];
 
-        const currentQuarterIndex = Math.floor(currentMonth / 3);
-
         const MonthGrid = ({ monthIndex }) => {
             const daysInMonth = getDaysInMonth(monthIndex, widgetYear);
             return (
-                <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ minWidth: 108 }}>
                     <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.75} sx={{ fontSize: 11 }}>
-                        {MONTHS[monthIndex].label}
+                        {MONTHS[monthIndex].label.slice(0, 3)}
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: '3px', maxWidth: 108 }}>
                         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
                             const state   = getDayState(monthIndex, day);
                             const isToday = state === 'today';
@@ -238,7 +243,7 @@ const DashboardPage = () => {
                                 <Box
                                     key={day}
                                     sx={{
-                                        width: 10, height: 10, borderRadius: '2px', flexShrink: 0,
+                                        width: 9, height: 9, borderRadius: '2px', flexShrink: 0,
                                         bgcolor: isToday ? todayColor : state === 'past' ? pastColor : futureColor,
                                         ...(isToday && {
                                             animation: 'pulseGreen 1.5s ease-in-out infinite',
@@ -256,29 +261,24 @@ const DashboardPage = () => {
             );
         };
 
-        const QuarterCard = ({ label, months, index }) => (
-            <Box
-                sx={{
-                    flex: { xs: '1 1 100%', md: '1 1 calc(50% - 8px)' },
-                    minWidth: 0,
-                    display: { xs: index === currentQuarterIndex ? 'block' : 'none', md: 'block' },
-                    p: 2, borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default'
-                }}
-            >
-                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={1.5} sx={{ fontSize: 11, letterSpacing: 1 }}>
-                    {label} · {widgetYear}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    {months.map((m) => <MonthGrid key={m} monthIndex={m} />)}
-                </Box>
-            </Box>
-        );
+        // Flatten all 12 months into one row, with a thin divider marking each quarter boundary
+        const entries = [];
+        quarters.forEach((q, qIndex) => {
+            q.months.forEach((m, mIndex) => {
+                if (mIndex === 0 && qIndex > 0) {
+                    entries.push({ type: 'divider', key: `div-${qIndex}` });
+                }
+                entries.push({ type: 'month', key: m, monthIndex: m });
+            });
+        });
 
         return (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {quarters.map((q, index) => (
-                    <QuarterCard key={q.label} label={q.label} months={q.months} index={index} />
-                ))}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 2, rowGap: 2.5 }}>
+                {entries.map((entry) =>
+                    entry.type === 'divider'
+                        ? <Box key={entry.key} sx={{ width: '1px', height: 90, flexShrink: 0, bgcolor: 'divider' }} />
+                        : <MonthGrid key={entry.key} monthIndex={entry.monthIndex} />
+                )}
             </Box>
         );
     };
@@ -288,25 +288,80 @@ const DashboardPage = () => {
 
             {/* Section 1 — Title + Date Picker + Quick Actions */}
             <PageCard>
-                {/* Top row — welcome + date pickers */}
+                {/* Top row — welcome + quick actions (left) / date pickers (right) */}
                 <Box
                     sx={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'flex-start',
                         flexDirection: { xs: 'column', sm: 'row' },
-                        gap: { xs: 2, sm: 0 },
-                        mb: 2
+                        gap: { xs: 2, sm: 3 }
                     }}
                 >
-                    <Box>
+                    <Box sx={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                         <Typography variant="h6" fontWeight={700}>
                             Welcome, {user?.firstName}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             Financial Dashboard
                         </Typography>
+
+                        {/* Quick actions */}
+                        <Box>
+                            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1} sx={{ textAlign: 'left' }}>
+                                What would you like to do today?
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" gap={1}>
+                                {QUICK_ACTIONS.map((action) => {
+                                    const Icon = action.icon;
+                                    return (
+                                        <Box
+                                            key={action.label}
+                                            onClick={() => navigate(action.route)}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.75,
+                                                px: 1.5,
+                                                py: 0.75,
+                                                borderRadius: 2.5,
+                                                border: '1px solid',
+                                                borderColor: 'divider',
+                                                bgcolor: 'background.default',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease',
+                                                '&:hover': {
+                                                    borderColor: 'primary.main',
+                                                    bgcolor: isDark
+                                                        ? 'rgba(17,82,147,0.12)'
+                                                        : 'rgba(17,82,147,0.06)',
+                                                    '& .qa-icon':  { color: 'primary.main' },
+                                                    '& .qa-label': { color: 'primary.main' }
+                                                }
+                                            }}
+                                        >
+                                            <Box
+                                                className="qa-icon"
+                                                sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', transition: 'color 0.15s ease' }}
+                                            >
+                                                <Icon sx={{ fontSize: 14 }} />
+                                            </Box>
+                                            <Typography
+                                                className="qa-label"
+                                                variant="caption"
+                                                fontWeight={500}
+                                                color="text.secondary"
+                                                sx={{ userSelect: 'none', transition: 'color 0.15s ease' }}
+                                            >
+                                                {action.label}
+                                            </Typography>
+                                        </Box>
+                                    );
+                                })}
+                            </Box>
+                        </Box>
                     </Box>
+
                     <Box display="flex" gap={2} flexShrink={0}>
                         <TextField
                             select label="Month" value={month}
@@ -324,121 +379,98 @@ const DashboardPage = () => {
                         </TextField>
                     </Box>
                 </Box>
+            </PageCard>
 
-                {/* Quick actions */}
-                <Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={1} sx={{ textAlign: 'left' }}>
-                        What would you like to do today?
-                    </Typography>
-                    <Box display="flex" flexWrap="wrap" gap={1}>
-                        {QUICK_ACTIONS.map((action) => {
-                            const Icon = action.icon;
-                            return (
-                                <Box
-                                    key={action.label}
-                                    onClick={() => navigate(action.route)}
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 0.75,
-                                        px: 1.5,
-                                        py: 0.75,
-                                        borderRadius: 2.5,
-                                        border: '1px solid',
-                                        borderColor: 'divider',
-                                        bgcolor: 'background.default',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.15s ease',
-                                        '&:hover': {
-                                            borderColor: 'primary.main',
-                                            bgcolor: isDark
-                                                ? 'rgba(17,82,147,0.12)'
-                                                : 'rgba(17,82,147,0.06)',
-                                            '& .qa-icon':  { color: 'primary.main' },
-                                            '& .qa-label': { color: 'primary.main' }
-                                        }
-                                    }}
-                                >
-                                    <Box
-                                        className="qa-icon"
-                                        sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', transition: 'color 0.15s ease' }}
+            {/* Section 2 — KPI Cards + Year Progress, side by side */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'stretch' }}>
+
+                {/* KPI Cards */}
+                <PageCard sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
+                    {loading ? (
+                        <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
+                    ) : (
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            {kpis.map((kpi, index) => {
+                                const sparkData = kpiSparklines[index];
+                                const sparkColor = index === 0 ? INCOME_COLOR
+                                    : index === 1 ? EXPENSE_COLOR
+                                    : index === 2 ? (kpi.value >= 0 ? theme.palette.success.main : theme.palette.error.main)
+                                    : null;
+
+                                return (
+                                    <Paper
+                                        key={index}
+                                        elevation={0}
+                                        sx={{
+                                            flex: '1 1 calc(50% - 8px)',
+                                            minWidth: 0,
+                                            p: { xs: 2, sm: 3 },
+                                            borderRadius: 3,
+                                            border: '1px solid',
+                                            borderColor: 'divider',
+                                            height: 156,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between',
+                                            bgcolor: 'background.default',
+                                            boxSizing: 'border-box'
+                                        }}
                                     >
-                                        <Icon sx={{ fontSize: 14 }} />
-                                    </Box>
-                                    <Typography
-                                        className="qa-label"
-                                        variant="caption"
-                                        fontWeight={500}
-                                        color="text.secondary"
-                                        sx={{ userSelect: 'none', transition: 'color 0.15s ease' }}
-                                    >
-                                        {action.label}
-                                    </Typography>
-                                </Box>
-                            );
-                        })}
-                    </Box>
-                </Box>
-            </PageCard>
+                                        <Typography variant="body2" color="text.secondary">{kpi.label}</Typography>
 
-            {/* Section 2 — KPI Cards */}
-            <PageCard>
-                {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
-                ) : (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        {kpis.map((kpi, index) => (
-                            <Paper
-                                key={index}
-                                elevation={0}
-                                sx={{
-                                    flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', lg: '1 1 0' },
-                                    minWidth: 0,
-                                    p: { xs: 2, sm: 3 },
-                                    borderRadius: 3,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    height: 120,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    bgcolor: 'background.default',
-                                    boxSizing: 'border-box'
-                                }}
-                            >
-                                <Typography variant="body2" color="text.secondary">{kpi.label}</Typography>
-                                <Typography variant="h5" fontWeight={700}>
-                                    <CountUp value={kpi.value} prefix="$" duration={1200} />
-                                </Typography>
-                            </Paper>
-                        ))}
-                    </Box>
-                )}
-            </PageCard>
+                                        <Box sx={{ height: 40 }}>
+                                            {sparkData && sparkData.length > 0 && (
+                                                <ResponsiveContainer width="100%" height={40}>
+                                                    <LineChart data={sparkData}>
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="v"
+                                                            stroke={sparkColor}
+                                                            strokeWidth={2}
+                                                            dot={false}
+                                                            isAnimationActive
+                                                            animationDuration={1000}
+                                                            animationEasing="ease-out"
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            )}
+                                        </Box>
 
-            {/* Section 3 — Year Progress */}
-            <PageCard>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                    <Typography variant="body2" fontWeight={600} color="text.secondary">
-                        Year progress — {new Date().getFullYear()}
-                    </Typography>
-                    <Box display="flex" alignItems="center" gap={2}>
-                        <Box display="flex" alignItems="center" gap={0.75}>
-                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: '#4caf50' }} />
-                            <Typography variant="caption" color="text.secondary">Today</Typography>
+                                        <Typography variant="h5" fontWeight={700}>
+                                            <CountUp value={kpi.value} prefix="$" duration={1200} />
+                                        </Typography>
+                                    </Paper>
+                                );
+                            })}
                         </Box>
-                        <Box display="flex" alignItems="center" gap={0.75}>
-                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#4a4a4a' : '#b0b0b0' }} />
-                            <Typography variant="caption" color="text.secondary">Past</Typography>
-                        </Box>
-                        <Box display="flex" alignItems="center" gap={0.75}>
-                            <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#1e1e1e' : '#e0e0e0' }} />
-                            <Typography variant="caption" color="text.secondary">Upcoming</Typography>
+                    )}
+                </PageCard>
+
+                {/* Year Progress */}
+                <PageCard sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
+                    <Box display="flex" flexWrap="wrap" justifyContent="space-between" alignItems="center" gap={1} mb={2}>
+                        <Typography variant="body2" fontWeight={600} color="text.secondary">
+                            Year progress — {new Date().getFullYear()}
+                        </Typography>
+                        <Box display="flex" alignItems="center" gap={2}>
+                            <Box display="flex" alignItems="center" gap={0.75}>
+                                <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: '#4caf50' }} />
+                                <Typography variant="caption" color="text.secondary">Today</Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={0.75}>
+                                <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#4a4a4a' : '#b0b0b0' }} />
+                                <Typography variant="caption" color="text.secondary">Past</Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={0.75}>
+                                <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: isDark ? '#1e1e1e' : '#e0e0e0' }} />
+                                <Typography variant="caption" color="text.secondary">Upcoming</Typography>
+                            </Box>
                         </Box>
                     </Box>
-                </Box>
-                <YearProgressWidget />
-            </PageCard>
+                    <YearProgressWidget />
+                </PageCard>
+            </Box>
 
             {/* Section 4 — Overview */}
             <PageCard>
