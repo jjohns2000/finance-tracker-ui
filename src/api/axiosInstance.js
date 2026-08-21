@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { MAINTENANCE_MODE } from '../config/maintenance';
 
 const axiosInstance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -9,6 +10,9 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
     (config) => {
+        if (MAINTENANCE_MODE) {
+            return Promise.reject(new Error('Maintenance mode: request blocked'));
+        }
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;

@@ -10,14 +10,9 @@ import {
     IconButton,
     Typography,
     Tooltip,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogContentText,
-    DialogActions,
-    Button,
     useTheme as useMuiTheme
 } from '@mui/material';
+import ConfirmDialog from './ui/ConfirmDialog';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
@@ -350,35 +345,14 @@ const Sidebar = () => {
             </Box>
 
             {/* Logout dialog */}
-            <Dialog
+            <ConfirmDialog
                 open={logoutDialogOpen}
                 onClose={handleLogoutCancel}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700 }}>Sign out</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Are you sure you want to sign out of FinanceTracker?
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={handleLogoutCancel}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleLogoutConfirm}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Sign out
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                onConfirm={handleLogoutConfirm}
+                title="Sign out"
+                message="Are you sure you want to sign out of FinanceTracker?"
+                confirmLabel="Sign out"
+            />
         </>
     );
 };

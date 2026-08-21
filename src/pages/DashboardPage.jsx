@@ -14,13 +14,13 @@ import PageLayout from '../components/PageLayout';
 import CountUp from '../components/CountUp';
 import PageCard, { hideScrollbar } from '../components/PageCard';
 import CreditCardIcon from '../components/CreditCardIcon';
+import LoadingState from '../components/ui/LoadingState';
+import MonthYearPicker, { MONTHS } from '../components/ui/MonthYearPicker';
+import { formatCurrency } from '../utils/format';
 import {
     Box,
     Typography,
     Paper,
-    TextField,
-    MenuItem,
-    CircularProgress,
     useTheme
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -45,23 +45,7 @@ import {
 } from 'recharts';
 import { getMonthlyCreditCardSummary } from '../api/creditCardApi';
 
-const MONTHS = [
-    { value: 1,  label: 'January' },
-    { value: 2,  label: 'February' },
-    { value: 3,  label: 'March' },
-    { value: 4,  label: 'April' },
-    { value: 5,  label: 'May' },
-    { value: 6,  label: 'June' },
-    { value: 7,  label: 'July' },
-    { value: 8,  label: 'August' },
-    { value: 9,  label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' }
-];
-
 const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
 const CHART_COLORS = [
     '#7B8EC8', '#8FBD8F', '#C49A6C', '#B07DB0', '#7FBCBC',
@@ -184,9 +168,6 @@ const DashboardPage = () => {
         last6Trend.map(t => ({ v: t.Expense })),
         last6Trend.map(t => ({ v: t.Income - t.Expense }))
     ];
-
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const CustomTooltip = ({ active, payload, label }) => {
         if (!active || !payload?.length) return null;
@@ -362,21 +343,8 @@ const DashboardPage = () => {
                         </Box>
                     </Box>
 
-                    <Box display="flex" gap={2} flexShrink={0}>
-                        <TextField
-                            select label="Month" value={month}
-                            onChange={(e) => setMonth(parseInt(e.target.value))}
-                            size="small" sx={{ width: 140 }}
-                        >
-                            {MONTHS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
-                        </TextField>
-                        <TextField
-                            select label="Year" value={year}
-                            onChange={(e) => setYear(parseInt(e.target.value))}
-                            size="small" sx={{ width: 100 }}
-                        >
-                            {YEARS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                        </TextField>
+                    <Box flexShrink={0}>
+                        <MonthYearPicker month={month} year={year} onMonthChange={setMonth} onYearChange={setYear} />
                     </Box>
                 </Box>
             </PageCard>
@@ -387,7 +355,7 @@ const DashboardPage = () => {
                 {/* KPI Cards */}
                 <PageCard sx={{ flex: { xs: '1 1 100%', lg: '1 1 0' }, minWidth: 0 }}>
                     {loading ? (
-                        <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
+                        <LoadingState />
                     ) : (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                             {kpis.map((kpi, index) => {
@@ -475,7 +443,7 @@ const DashboardPage = () => {
             {/* Section 4 — Overview */}
             <PageCard>
                 {chartsLoading ? (
-                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
+                    <LoadingState py={6} />
                 ) : (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
 
@@ -576,7 +544,7 @@ const DashboardPage = () => {
             {/* Section 5 — Income related */}
             <PageCard>
                 {chartsLoading ? (
-                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
+                    <LoadingState py={6} />
                 ) : (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
 
@@ -653,7 +621,7 @@ const DashboardPage = () => {
             {/* Section 6 — Expenses related */}
             <PageCard>
                 {chartsLoading ? (
-                    <Box display="flex" justifyContent="center" py={6}><CircularProgress size={24} /></Box>
+                    <LoadingState py={6} />
                 ) : (
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
 

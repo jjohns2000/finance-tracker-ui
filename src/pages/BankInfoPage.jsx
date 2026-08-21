@@ -14,20 +14,21 @@ import PageLayout from '../components/PageLayout';
 import PageCard from '../components/PageCard';
 import SectionHeader from '../pages/SectionHeader';
 import CreditCardIcon from '../components/CreditCardIcon';
+import DataTable from '../components/ui/DataTable';
+import FormDialog from '../components/ui/FormDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import LoadingState from '../components/ui/LoadingState';
+import EmptyState from '../components/ui/EmptyState';
+import { formatCurrency, formatDate } from '../utils/format';
 import {
     Box,
     Typography,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     TextField,
     MenuItem,
     IconButton,
     Tooltip,
-    Chip,
-    CircularProgress
+    Chip
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -65,6 +66,24 @@ const emptyCreditCardForm = {
     startDate: '',
     cardColor: '#f44336'
 };
+
+const CREDIT_CARD_COLUMNS = [
+    { key: 'icon', label: '', width: '56px' },
+    { key: 'name', label: 'Card name', width: '2fr' },
+    { key: 'limit', label: 'Limit', width: '1fr' },
+    { key: 'since', label: 'Since', width: '1fr' },
+    { key: 'actions', label: '', width: '80px', align: 'right' }
+];
+
+const RUNNING_TOTAL_COLUMNS = [
+    { key: 'bank', label: 'Bank', width: '2fr', align: 'left' },
+    { key: 'opening', label: 'Initial Opening', width: '1fr', align: 'right' },
+    { key: 'deposits', label: 'Total Deposits', width: '1fr', align: 'right' },
+    { key: 'interest', label: 'Total Interest', width: '1fr', align: 'right' },
+    { key: 'withdrawals', label: 'Total Withdrawals', width: '1fr', align: 'right' },
+    { key: 'balance', label: 'Current Balance', width: '1fr', align: 'right' },
+    { key: 'months', label: 'Months Tracked', width: '1fr', align: 'right' }
+];
 
 const BankInfoPage = () => {
     const { showSnackbar } = useSnackbar();
@@ -240,11 +259,69 @@ const BankInfoPage = () => {
         }
     };
 
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        })}`;
+    const renderCreditCardCell = (card, col) => {
+        switch (col.key) {
+            case 'icon':
+                return <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />;
+            case 'name':
+                return <Typography variant="body2" fontWeight={600}>{card.cardName}</Typography>;
+            case 'limit':
+                return <Typography variant="body2" color="text.secondary">{formatCurrency(card.creditLimit)}</Typography>;
+            case 'since':
+                return (
+                    <Typography variant="body2" color="text.secondary">
+                        {formatDate(card.startDate, { year: 'numeric', month: 'short' })}
+                    </Typography>
+                );
+            case 'actions':
+                return (
+                    <Box display="flex" gap={0.5}>
+                        <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => handleOpenEditCreditCard(card)}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteCreditCard(card)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
+
+    const renderRunningTotalCell = (account, col) => {
+        switch (col.key) {
+            case 'bank':
+                return (
+                    <Box>
+                        <Typography variant="body2" fontWeight={600} display="block">{account.bankName}</Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">{account.accountType}</Typography>
+                    </Box>
+                );
+            case 'opening':
+                return <Typography variant="body2">{formatCurrency(account.initialOpeningBalance)}</Typography>;
+            case 'deposits':
+                return <Typography variant="body2" color="success.main" fontWeight={600}>{formatCurrency(account.totalDeposits)}</Typography>;
+            case 'interest':
+                return <Typography variant="body2" color="success.main" fontWeight={600}>{formatCurrency(account.totalInterest)}</Typography>;
+            case 'withdrawals':
+                return <Typography variant="body2" color="error.main" fontWeight={600}>{formatCurrency(account.totalWithdrawals)}</Typography>;
+            case 'balance':
+                return <Typography variant="body2" fontWeight={600}>{formatCurrency(account.currentBalance)}</Typography>;
+            case 'months':
+                return (
+                    <Typography variant="body2" color="text.secondary">
+                        {account.monthsTracked} {account.monthsTracked === 1 ? 'month' : 'months'}
+                    </Typography>
+                );
+            default:
+                return null;
+        }
+    };
 
     return (
         <PageLayout sidebar={<Sidebar />}>
@@ -275,15 +352,9 @@ const BankInfoPage = () => {
                     }
                 />
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={24} />
-                    </Box>
+                    <LoadingState />
                 ) : accounts.length === 0 ? (
-                    <Box display="flex" alignItems="center" justifyContent="center" py={4}>
-                        <Typography variant="body2" color="text.secondary">
-                            No accounts added yet. Click Add account to get started.
-                        </Typography>
-                    </Box>
+                    <EmptyState message="No accounts added yet. Click Add account to get started." />
                 ) : (
                     <Box
                         sx={{
@@ -362,99 +433,15 @@ const BankInfoPage = () => {
                     }
                 />
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={24} />
-                    </Box>
-                ) : creditCards.length === 0 ? (
-                    <Box display="flex" alignItems="center" justifyContent="center" py={4}>
-                        <Typography variant="body2" color="text.secondary">
-                            No credit cards added yet. Click Add card to get started.
-                        </Typography>
-                    </Box>
+                    <LoadingState />
                 ) : (
-                    <Box
-                        sx={{
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            maxHeight: 300,
-                            overflowY: 'auto'
-                        }}
-                    >
-                        {/* Header */}
-                        <Box
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: '56px 2fr 1fr 1fr 80px',
-                                px: 2,
-                                py: 1.5,
-                                bgcolor: 'background.default',
-                                borderBottom: '1px solid',
-                                borderColor: 'divider'
-                            }}
-                        >
-                            {['', 'Card name', 'Limit', 'Since', ''].map((col, i) => (
-                                <Typography
-                                    key={i}
-                                    variant="caption"
-                                    color="text.secondary"
-                                    fontWeight={600}
-                                >
-                                    {col}
-                                </Typography>
-                            ))}
-                        </Box>
-
-                        {/* Rows */}
-                        {creditCards.map((card, index) => (
-                            <Box
-                                key={card.publicId}
-                                sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '56px 2fr 1fr 1fr 80px',
-                                    px: 2,
-                                    py: 1.5,
-                                    alignItems: 'center',
-                                    borderBottom: index < creditCards.length - 1
-                                        ? '1px solid' : 'none',
-                                    borderColor: 'divider',
-                                    '&:hover': { bgcolor: 'background.default' }
-                                }}
-                            >
-                                <Box display="flex" alignItems="center">
-                                    <CreditCardIcon
-                                        color={card.cardColor || '#f44336'}
-                                        size="sm"
-                                    />
-                                </Box>
-                                <Typography variant="body2" fontWeight={600}>
-                                    {card.cardName}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {formatCurrency(card.creditLimit)}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {new Date(card.startDate).toLocaleDateString('en-CA', {
-                                        year: 'numeric',
-                                        month: 'short'
-                                    })}
-                                </Typography>
-                                <Box display="flex" justifyContent="flex-end" gap={0.5}>
-                                    <Tooltip title="Edit">
-                                        <IconButton size="small" onClick={() => handleOpenEditCreditCard(card)}>
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Delete">
-                                        <IconButton size="small" color="error" onClick={() => handleOpenDeleteCreditCard(card)}>
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-                            </Box>
-                        ))}
-                    </Box>
+                    <DataTable
+                        columns={CREDIT_CARD_COLUMNS}
+                        rows={creditCards}
+                        renderCell={renderCreditCardCell}
+                        emptyMessage="No credit cards added yet. Click Add card to get started."
+                        maxHeight={300}
+                    />
                 )}
             </PageCard>
 
@@ -464,352 +451,168 @@ const BankInfoPage = () => {
                     title="Running totals"
                     subtitle="Cumulative account data across all months"
                 />
-                <Box
-                    sx={{
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 2,
-                        overflow: 'hidden'
-                    }}
-                >
-                    {/* Header */}
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr',
-                            px: 2,
-                            py: 1.5,
-                            bgcolor: 'background.default',
-                            borderBottom: '1px solid',
-                            borderColor: 'divider'
-                        }}
-                    >
-                        {[
-                            'Bank',
-                            'Initial Opening',
-                            'Total Deposits',
-                            'Total Interest',
-                            'Total Withdrawals',
-                            'Current Balance',
-                            'Months Tracked'
-                        ].map((col, i) => (
-                            <Typography
-                                key={i}
-                                variant="caption"
-                                color="text.secondary"
-                                fontWeight={600}
-                                textAlign={i === 0 ? 'left' : 'right'}
-                            >
-                                {col}
-                            </Typography>
-                        ))}
-                    </Box>
-
-                    {/* Rows */}
-                    {loading ? (
-                        <Box display="flex" justifyContent="center" py={4}>
-                            <CircularProgress size={24} />
-                        </Box>
-                    ) : runningTotals.length === 0 ? (
-                        <Box px={2} py={3}>
-                            <Typography variant="body2" color="text.secondary">
-                                No data available yet.
-                            </Typography>
-                        </Box>
-                    ) : (
-                        runningTotals.map((account, index) => (
-                            <Box
-                                key={account.accountPublicId}
-                                sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 1fr 1fr',
-                                    px: 2,
-                                    py: 1.5,
-                                    alignItems: 'center',
-                                    borderBottom: index < runningTotals.length - 1
-                                        ? '1px solid' : 'none',
-                                    borderColor: 'divider',
-                                    '&:hover': { bgcolor: 'background.default' }
-                                }}
-                            >
-                                <Box>
-                                    <Typography variant="body2" fontWeight={600} display="block">
-                                        {account.bankName}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                        {account.accountType}
-                                    </Typography>
-                                </Box>
-                                <Typography variant="body2" textAlign="right">
-                                    {formatCurrency(account.initialOpeningBalance)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="success.main" fontWeight={600}>
-                                    {formatCurrency(account.totalDeposits)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="success.main" fontWeight={600}>
-                                    {formatCurrency(account.totalInterest)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="error.main" fontWeight={600}>
-                                    {formatCurrency(account.totalWithdrawals)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" fontWeight={600}>
-                                    {formatCurrency(account.currentBalance)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="text.secondary">
-                                    {account.monthsTracked}{' '}
-                                    {account.monthsTracked === 1 ? 'month' : 'months'}
-                                </Typography>
-                            </Box>
-                        ))
-                    )}
-                </Box>
+                {loading ? (
+                    <LoadingState />
+                ) : (
+                    <DataTable
+                        columns={RUNNING_TOTAL_COLUMNS}
+                        rows={runningTotals}
+                        getRowKey={(row) => row.accountPublicId}
+                        renderCell={renderRunningTotalCell}
+                        emptyMessage="No data available yet."
+                    />
+                )}
             </PageCard>
 
             {/* Add / Edit Account Dialog */}
-            <Dialog
+            <FormDialog
                 open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                onCancel={() => setDialogOpen(false)}
+                onSave={handleSave}
+                saving={saving}
+                title={selectedAccount ? 'Edit account' : 'Add account'}
+                saveLabel={selectedAccount ? 'Save changes' : 'Add account'}
+                saveDisabled={!form.bankId || !form.accountTypeId || form.openingBalance === ''}
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {selectedAccount ? 'Edit account' : 'Add account'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                        <TextField
-                            select
-                            label="Bank"
-                            value={form.bankId}
-                            onChange={(e) => setForm({ ...form, bankId: e.target.value })}
-                            fullWidth
-                            required
-                        >
-                            {banks.map((bank) => (
-                                <MenuItem key={bank.id} value={bank.id}>
-                                    {bank.bankName}
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                        <TextField
-                            select
-                            label="Account type"
-                            value={form.accountTypeId}
-                            onChange={(e) => setForm({ ...form, accountTypeId: e.target.value })}
-                            fullWidth
-                            required
-                        >
-                            {accountTypes.map((type) => (
-                                <MenuItem key={type.id} value={type.id}>
-                                    {type.typeName}
-                                </MenuItem>
-                            ))}
-                        </TextField>
-                        <TextField
-                            label="Opening balance"
-                            type="number"
-                            value={form.openingBalance}
-                            onChange={(e) => setForm({ ...form, openingBalance: e.target.value })}
-                            fullWidth
-                            required
-                            inputProps={{ min: 0, step: '0.01' }}
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSave}
-                        variant="contained"
-                        disabled={saving || !form.bankId || !form.accountTypeId || form.openingBalance === ''}
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {saving
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedAccount ? 'Save changes' : 'Add account'
-                        }
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                <TextField
+                    select
+                    label="Bank"
+                    value={form.bankId}
+                    onChange={(e) => setForm({ ...form, bankId: e.target.value })}
+                    fullWidth
+                    required
+                >
+                    {banks.map((bank) => (
+                        <MenuItem key={bank.id} value={bank.id}>{bank.bankName}</MenuItem>
+                    ))}
+                </TextField>
+                <TextField
+                    select
+                    label="Account type"
+                    value={form.accountTypeId}
+                    onChange={(e) => setForm({ ...form, accountTypeId: e.target.value })}
+                    fullWidth
+                    required
+                >
+                    {accountTypes.map((type) => (
+                        <MenuItem key={type.id} value={type.id}>{type.typeName}</MenuItem>
+                    ))}
+                </TextField>
+                <TextField
+                    label="Opening balance"
+                    type="number"
+                    value={form.openingBalance}
+                    onChange={(e) => setForm({ ...form, openingBalance: e.target.value })}
+                    fullWidth
+                    required
+                    inputProps={{ min: 0, step: '0.01' }}
+                />
+            </FormDialog>
 
             {/* Delete Account Dialog */}
-            <Dialog
+            <ConfirmDialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove account</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
+                onConfirm={handleDelete}
+                title="Remove account"
+                message={
+                    <>
                         Are you sure you want to remove{' '}
-                        <strong>
-                            {selectedAccount?.bankName} — {selectedAccount?.accountType}
-                        </strong>?
+                        <strong>{selectedAccount?.bankName} — {selectedAccount?.accountType}</strong>?
                         This action cannot be undone.
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setDeleteDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDelete}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Remove
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                    </>
+                }
+                confirmLabel="Remove"
+            />
 
             {/* Add / Edit Credit Card Dialog */}
-            <Dialog
+            <FormDialog
                 open={creditCardDialogOpen}
-                onClose={() => setCreditCardDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                onCancel={() => setCreditCardDialogOpen(false)}
+                onSave={handleSaveCreditCard}
+                saving={savingCreditCard}
+                title={selectedCreditCard ? 'Edit credit card' : 'Add credit card'}
+                saveLabel={selectedCreditCard ? 'Save changes' : 'Add card'}
+                saveDisabled={
+                    !creditCardForm.cardName ||
+                    !creditCardForm.creditLimit ||
+                    !creditCardForm.startDate
+                }
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {selectedCreditCard ? 'Edit credit card' : 'Add credit card'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                        <TextField
-                            label="Card name"
-                            value={creditCardForm.cardName}
-                            onChange={(e) => setCreditCardForm({ ...creditCardForm, cardName: e.target.value })}
-                            fullWidth
-                            required
-                        />
-                        <TextField
-                            label="Credit limit"
-                            type="number"
-                            value={creditCardForm.creditLimit}
-                            onChange={(e) => setCreditCardForm({ ...creditCardForm, creditLimit: e.target.value })}
-                            fullWidth
-                            required
-                            inputProps={{ min: 0, step: '0.01' }}
-                        />
-                        <TextField
-                            label="Start date"
-                            type="date"
-                            value={creditCardForm.startDate}
-                            onChange={(e) => setCreditCardForm({ ...creditCardForm, startDate: e.target.value })}
-                            fullWidth
-                            required
-                            InputLabelProps={{ shrink: true }}
-                        />
+                <TextField
+                    label="Card name"
+                    value={creditCardForm.cardName}
+                    onChange={(e) => setCreditCardForm({ ...creditCardForm, cardName: e.target.value })}
+                    fullWidth
+                    required
+                />
+                <TextField
+                    label="Credit limit"
+                    type="number"
+                    value={creditCardForm.creditLimit}
+                    onChange={(e) => setCreditCardForm({ ...creditCardForm, creditLimit: e.target.value })}
+                    fullWidth
+                    required
+                    inputProps={{ min: 0, step: '0.01' }}
+                />
+                <TextField
+                    label="Start date"
+                    type="date"
+                    value={creditCardForm.startDate}
+                    onChange={(e) => setCreditCardForm({ ...creditCardForm, startDate: e.target.value })}
+                    fullWidth
+                    required
+                    InputLabelProps={{ shrink: true }}
+                />
 
-                        {/* Color picker */}
-                        <Box>
-                            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                                Card color
-                            </Typography>
-                            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-                                {CARD_COLORS.map((color) => (
-                                    <Box
-                                        key={color}
-                                        onClick={() => setCreditCardForm({ ...creditCardForm, cardColor: color })}
-                                        sx={{
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: 1.5,
-                                            bgcolor: color,
-                                            cursor: 'pointer',
-                                            border: creditCardForm.cardColor === color
-                                                ? '3px solid white'
-                                                : '3px solid transparent',
-                                            outline: creditCardForm.cardColor === color
-                                                ? `2px solid ${color}`
-                                                : 'none',
-                                            transition: 'transform 0.1s ease',
-                                            '&:hover': { transform: 'scale(1.15)' }
-                                        }}
-                                    />
-                                ))}
-                            </Box>
-                        </Box>
-
-                        {/* Preview */}
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                            <CreditCardIcon color={creditCardForm.cardColor} size="md" />
-                            <Typography variant="caption" color="text.secondary">
-                                Preview
-                            </Typography>
-                        </Box>
+                {/* Color picker */}
+                <Box>
+                    <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                        Card color
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
+                        {CARD_COLORS.map((color) => (
+                            <Box
+                                key={color}
+                                onClick={() => setCreditCardForm({ ...creditCardForm, cardColor: color })}
+                                sx={{
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: 1.5,
+                                    bgcolor: color,
+                                    cursor: 'pointer',
+                                    border: creditCardForm.cardColor === color
+                                        ? '3px solid white'
+                                        : '3px solid transparent',
+                                    outline: creditCardForm.cardColor === color
+                                        ? `2px solid ${color}`
+                                        : 'none',
+                                    transition: 'transform 0.1s ease',
+                                    '&:hover': { transform: 'scale(1.15)' }
+                                }}
+                            />
+                        ))}
                     </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setCreditCardDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSaveCreditCard}
-                        variant="contained"
-                        disabled={
-                            savingCreditCard ||
-                            !creditCardForm.cardName ||
-                            !creditCardForm.creditLimit ||
-                            !creditCardForm.startDate
-                        }
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {savingCreditCard
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedCreditCard ? 'Save changes' : 'Add card'
-                        }
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                </Box>
+
+                {/* Preview */}
+                <Box display="flex" alignItems="center" gap={1.5}>
+                    <CreditCardIcon color={creditCardForm.cardColor} size="md" />
+                    <Typography variant="caption" color="text.secondary">
+                        Preview
+                    </Typography>
+                </Box>
+            </FormDialog>
 
             {/* Delete Credit Card Dialog */}
-            <Dialog
+            <ConfirmDialog
                 open={creditCardDeleteDialogOpen}
                 onClose={() => setCreditCardDeleteDialogOpen(false)}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove credit card</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        Are you sure you want to remove{' '}
-                        <strong>{selectedCreditCard?.cardName}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setCreditCardDeleteDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDeleteCreditCard}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Remove
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                onConfirm={handleDeleteCreditCard}
+                title="Remove credit card"
+                message={<>Are you sure you want to remove <strong>{selectedCreditCard?.cardName}</strong>?</>}
+                confirmLabel="Remove"
+            />
 
         </PageLayout>
     );

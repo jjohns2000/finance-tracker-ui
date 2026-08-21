@@ -6,7 +6,6 @@ import {
     Button,
     IconButton,
     LinearProgress,
-    CircularProgress,
     Chip
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
@@ -17,6 +16,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import { getCheckInStatus, saveCheckInAnswer } from '../api/checkInApi';
 import { useSnackbar } from '../context/SnackbarContext';
+import LoadingState, { InlineSpinner } from './ui/LoadingState';
 
 const TYPE_LABEL = {
     deposit:    'Deposit',
@@ -189,18 +189,8 @@ const CheckInWidget = ({ onDataSaved, types = null }) => {
         }
     };
 
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        })}`;
-
     if (loading) {
-        return (
-            <Box display="flex" justifyContent="center" py={4}>
-                <CircularProgress size={24} />
-            </Box>
-        );
+        return <LoadingState />;
     }
 
     if (done || total === 0) {
@@ -455,7 +445,7 @@ const CheckInWidget = ({ onDataSaved, types = null }) => {
                                 disabled={saving}
                                 sx={{ borderRadius: 2, textTransform: 'none' }}
                                 endIcon={saving
-                                    ? <CircularProgress size={14} color="inherit" />
+                                    ? <InlineSpinner size={14} />
                                     : <NavigateNextIcon fontSize="small" />
                                 }
                             >

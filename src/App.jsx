@@ -4,6 +4,7 @@ import { NavProvider } from './context/NavContext';
 import { SnackbarProvider } from './context/SnackbarContext';
 import { SidebarProvider } from './context/SidebarContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import MaintenanceBanner from './components/MaintenanceBanner';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -60,6 +61,7 @@ function App() {
                     </AuthProvider>
                 </SidebarProvider>
             </SnackbarProvider>
+            <MaintenanceBanner />
         </BrowserRouter>
     );
 }

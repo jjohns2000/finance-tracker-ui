@@ -20,6 +20,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { extractStatement, checkDuplicates, importStatement } from '../api/statementApi';
 import { useSnackbar } from '../context/SnackbarContext';
+import { formatCurrency } from '../utils/format';
 
 const STEP = { UPLOAD: 'upload', EXTRACTING: 'extracting', PREVIEW: 'preview', IMPORTING: 'importing', DONE: 'done' };
 
@@ -195,9 +196,6 @@ const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = 
             setStep(STEP.PREVIEW);
         }
     };
-
-    const formatCurrency = (v) =>
-        `$${(v ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     const debitCount   = rows.filter(r => r.type === 'debit').length;
     const creditCount  = rows.filter(r => r.type === 'credit').length;

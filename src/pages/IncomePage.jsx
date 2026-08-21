@@ -10,6 +10,14 @@ import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import PageCard from '../components/PageCard';
 import CheckInWidget from '../components/CheckInWidget';
+import DataTable from '../components/ui/DataTable';
+import FormDialog from '../components/ui/FormDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import LoadingState from '../components/ui/LoadingState';
+import EmptyState from '../components/ui/EmptyState';
+import { MetricCard, TrendIndicator } from '../components/ui/MetricCard';
+import MonthYearPicker, { MONTHS } from '../components/ui/MonthYearPicker';
+import { formatCurrency, formatDate } from '../utils/format';
 import {
     Box,
     Typography,
@@ -17,21 +25,13 @@ import {
     TextField,
     IconButton,
     Tooltip,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     Button,
-    CircularProgress,
     Divider,
     Chip
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import CountUp from '../components/CountUp';
 import {
     getEmploymentTypes,
     getPayFrequencies,
@@ -44,23 +44,20 @@ import {
     deleteMonthlySalary
 } from '../api/employmentApi';
 
-const MONTHS = [
-    { value: 1,  label: 'January' },
-    { value: 2,  label: 'February' },
-    { value: 3,  label: 'March' },
-    { value: 4,  label: 'April' },
-    { value: 5,  label: 'May' },
-    { value: 6,  label: 'June' },
-    { value: 7,  label: 'July' },
-    { value: 8,  label: 'August' },
-    { value: 9,  label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' }
+const currentYear = new Date().getFullYear();
+
+const ACCOUNT_COLUMNS = [
+    { key: 'bank', label: 'Bank', width: '2fr' },
+    { key: 'type', label: 'Type', width: '1fr' },
+    { key: 'deposit', label: 'Deposit', width: '1fr' },
+    { key: 'interest', label: 'Interest', width: '1fr' }
 ];
 
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+const SALARY_COLUMNS = [
+    { key: 'job', label: 'Job', width: '2fr' },
+    { key: 'netPay', label: 'Net Pay', width: '1fr' },
+    { key: 'actions', label: '', width: '80px' }
+];
 
 const IncomePage = () => {
     const { showSnackbar } = useSnackbar();
@@ -180,11 +177,6 @@ const IncomePage = () => {
         }
     };
 
-    const formatDate = (date) => {
-        if (!date) return '—';
-        return new Date(date).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
-    };
-
     const handleOpenAddJob = () => {
         setSelectedJob(null);
         setJobForm({ companyName: '', jobRole: '', employmentTypeId: '', payFrequencyId: '', startDate: '', endDate: '' });
@@ -297,32 +289,44 @@ const IncomePage = () => {
         }
     };
 
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-    const TrendValue = ({ value }) => {
-        const positive = (value ?? 0) >= 0;
-        return (
-            <Box display="flex" alignItems="center" gap={0.5}>
-                {positive
-                    ? <TrendingUpIcon fontSize="small" color="success" />
-                    : <TrendingDownIcon fontSize="small" color="error" />
-                }
-                <Typography variant="body2" fontWeight={600} color={positive ? 'success.main' : 'error.main'}>
-                    <CountUp value={Math.abs(value ?? 0)} prefix="$" duration={1200} />
-                </Typography>
-            </Box>
-        );
+    const renderAccountCell = (account, col) => {
+        const data = getSummaryForAccount(account);
+        switch (col.key) {
+            case 'bank':
+                return <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>;
+            case 'type':
+                return <Typography variant="body2" color="text.secondary" noWrap>{account.accountType}</Typography>;
+            case 'deposit':
+                return <Typography variant="body2" fontWeight={600} color="success.main">{formatCurrency(data?.deposit)}</Typography>;
+            case 'interest':
+                return <Typography variant="body2" fontWeight={600} color="success.main">{formatCurrency(data?.interest)}</Typography>;
+            default:
+                return null;
+        }
     };
 
-    const MetricBox = ({ label, rawValue, color }) => (
-        <Box sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
-            <Typography variant="caption" color="text.secondary">{label}</Typography>
-            <Typography variant="body1" fontWeight={600} mt={0.5} color={color || 'text.primary'}>
-                <CountUp value={rawValue ?? 0} prefix="$" duration={1200} />
-            </Typography>
-        </Box>
-    );
+    const renderSalaryCell = (salary, col) => {
+        switch (col.key) {
+            case 'job':
+                return (
+                    <Box>
+                        <Typography variant="body2" fontWeight={600}>{salary.companyName}</Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">{salary.jobRole}</Typography>
+                    </Box>
+                );
+            case 'netPay':
+                return <Typography variant="body2" fontWeight={600} color="success.main">{formatCurrency(salary.netPay)}</Typography>;
+            case 'actions':
+                return (
+                    <Box display="flex" justifyContent="flex-end" gap={0.5}>
+                        <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpenEditSalary(salary)}><EditIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleOpenDeleteSalary(salary)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
 
     return (
         <PageLayout sidebar={<Sidebar />}>
@@ -333,14 +337,7 @@ const IncomePage = () => {
                     <Typography variant="h6" fontWeight={700}>Income</Typography>
                     <Typography variant="body2" color="text.secondary">Monthly income overview</Typography>
                 </Box>
-                <Box display="flex" gap={2}>
-                    <TextField select label="Month" value={month} onChange={(e) => setMonth(parseInt(e.target.value))} size="small" sx={{ width: 140 }}>
-                        {MONTHS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
-                    </TextField>
-                    <TextField select label="Year" value={year} onChange={(e) => setYear(parseInt(e.target.value))} size="small" sx={{ width: 100 }}>
-                        {YEARS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                    </TextField>
-                </Box>
+                <MonthYearPicker month={month} year={year} onMonthChange={setMonth} onYearChange={setYear} />
             </PageCard>
 
             {/* Section 2 — Income Check-In */}
@@ -354,18 +351,18 @@ const IncomePage = () => {
             {/* Section 3 — Aggregate + Contributing Accounts */}
             <PageCard>
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
+                    <LoadingState />
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>Aggregate total</Typography>
                             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                                <MetricBox label="Opening balance" rawValue={aggregate?.totalOpeningBalance} />
-                                <MetricBox label="Total deposit"   rawValue={aggregate?.totalDeposit}        color="success.main" />
-                                <MetricBox label="Closing balance" rawValue={aggregate?.totalClosingBalance} />
+                                <MetricCard label="Opening balance" value={aggregate?.totalOpeningBalance} />
+                                <MetricCard label="Total deposit"   value={aggregate?.totalDeposit}        color="success.main" />
+                                <MetricCard label="Closing balance" value={aggregate?.totalClosingBalance} />
                                 <Box sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
                                     <Typography variant="caption" color="text.secondary">Trend</Typography>
-                                    <Box mt={0.5}><TrendValue value={aggregate?.totalTrend} /></Box>
+                                    <Box mt={0.5}><TrendIndicator value={aggregate?.totalTrend} /></Box>
                                 </Box>
                             </Box>
                         </Box>
@@ -375,42 +372,15 @@ const IncomePage = () => {
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>Contributing accounts</Typography>
-                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', maxHeight: 260, overflowY: 'auto' }}>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', px: 2, py: 1, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-                                    {['Bank', 'Type', 'Deposit', 'Interest'].map((col, i) => (
-                                        <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>{col}</Typography>
-                                    ))}
-                                </Box>
-                                {accounts.length === 0 ? (
-                                    <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No accounts found.</Typography></Box>
-                                ) : (
-                                    accounts.map((account, index) => {
-                                        const data = getSummaryForAccount(account);
-                                        return (
-                                            <Box
-                                                key={account.publicId}
-                                                onClick={() => handleOpenEdit(account)}
-                                                sx={{
-                                                    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr',
-                                                    px: 2, py: 1.5, alignItems: 'center', cursor: 'pointer',
-                                                    borderBottom: index < accounts.length - 1 ? '1px solid' : 'none',
-                                                    borderColor: 'divider',
-                                                    '&:hover': { bgcolor: 'action.hover' }
-                                                }}
-                                            >
-                                                <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>
-                                                <Typography variant="body2" color="text.secondary" noWrap>{account.accountType}</Typography>
-                                                <Typography variant="body2" fontWeight={600} color="success.main">
-                                                    {formatCurrency(data?.deposit)}
-                                                </Typography>
-                                                <Typography variant="body2" fontWeight={600} color="success.main">
-                                                    {formatCurrency(data?.interest)}
-                                                </Typography>
-                                            </Box>
-                                        );
-                                    })
-                                )}
-                            </Box>
+                            <DataTable
+                                columns={ACCOUNT_COLUMNS}
+                                rows={accounts}
+                                getRowKey={(row) => row.publicId}
+                                renderCell={renderAccountCell}
+                                onRowClick={handleOpenEdit}
+                                emptyMessage="No accounts found."
+                                maxHeight={260}
+                            />
                         </Box>
                     </Box>
                 )}
@@ -427,8 +397,8 @@ const IncomePage = () => {
                             </Button>
                         </Box>
                         {employments.length === 0 ? (
-                            <Box display="flex" alignItems="center" justifyContent="center" py={4} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-                                <Typography variant="body2" color="text.secondary">No active jobs for this month.</Typography>
+                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                                <EmptyState message="No active jobs for this month." />
                             </Box>
                         ) : (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 320, overflowY: 'auto', pr: 0.5 }}>
@@ -469,38 +439,14 @@ const IncomePage = () => {
                                 Add salary
                             </Button>
                         </Box>
-                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', maxHeight: 320, overflowY: 'auto' }}>
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 80px', px: 2, py: 1, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-                                {['Job', 'Net Pay', ''].map((col, i) => (
-                                    <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>{col}</Typography>
-                                ))}
-                            </Box>
-                            {salaries.length === 0 ? (
-                                <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No salary entries for this month.</Typography></Box>
-                            ) : (
-                                salaries.map((salary, index) => (
-                                    <Box
-                                        key={salary.publicId}
-                                        sx={{
-                                            display: 'grid', gridTemplateColumns: '2fr 1fr 80px',
-                                            px: 2, py: 1.5, alignItems: 'center',
-                                            borderBottom: index < salaries.length - 1 ? '1px solid' : 'none',
-                                            borderColor: 'divider', '&:hover': { bgcolor: 'background.default' }
-                                        }}
-                                    >
-                                        <Box>
-                                            <Typography variant="body2" fontWeight={600}>{salary.companyName}</Typography>
-                                            <Typography variant="caption" color="text.secondary" display="block">{salary.jobRole}</Typography>
-                                        </Box>
-                                        <Typography variant="body2" fontWeight={600} color="success.main">{formatCurrency(salary.netPay)}</Typography>
-                                        <Box display="flex" justifyContent="flex-end" gap={0.5}>
-                                            <Tooltip title="Edit"><IconButton size="small" onClick={() => handleOpenEditSalary(salary)}><EditIcon fontSize="small" /></IconButton></Tooltip>
-                                            <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleOpenDeleteSalary(salary)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
-                                        </Box>
-                                    </Box>
-                                ))
-                            )}
-                        </Box>
+                        <DataTable
+                            columns={SALARY_COLUMNS}
+                            rows={salaries}
+                            getRowKey={(row) => row.publicId}
+                            renderCell={renderSalaryCell}
+                            emptyMessage="No salary entries for this month."
+                            maxHeight={320}
+                        />
                         {salaries.length > 0 && (
                             <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
                                 <Typography variant="body2" color="text.secondary">
@@ -513,98 +459,78 @@ const IncomePage = () => {
             </PageCard>
 
             {/* Job Add/Edit Dialog */}
-            <Dialog open={jobDialogOpen} onClose={() => setJobDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>{selectedJob ? 'Edit job' : 'Add job'}</DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                        <TextField label="Company name" value={jobForm.companyName} onChange={(e) => setJobForm({ ...jobForm, companyName: e.target.value })} fullWidth required />
-                        <TextField label="Job role" value={jobForm.jobRole} onChange={(e) => setJobForm({ ...jobForm, jobRole: e.target.value })} fullWidth required />
-                        <TextField select label="Employment type" value={jobForm.employmentTypeId} onChange={(e) => setJobForm({ ...jobForm, employmentTypeId: e.target.value })} fullWidth required>
-                            {employmentTypes.map((type) => <MenuItem key={type.id} value={type.id}>{type.typeName}</MenuItem>)}
-                        </TextField>
-                        <TextField select label="Pay frequency" value={jobForm.payFrequencyId} onChange={(e) => setJobForm({ ...jobForm, payFrequencyId: e.target.value })} fullWidth required>
-                            {payFrequencies.map((freq) => <MenuItem key={freq.id} value={freq.id}>{freq.frequencyName}</MenuItem>)}
-                        </TextField>
-                        <TextField label="Start date" type="date" value={jobForm.startDate} onChange={(e) => setJobForm({ ...jobForm, startDate: e.target.value })} fullWidth required InputLabelProps={{ shrink: true }} />
-                        <TextField label="End date" type="date" value={jobForm.endDate} onChange={(e) => setJobForm({ ...jobForm, endDate: e.target.value })} fullWidth InputLabelProps={{ shrink: true }} helperText="Leave empty if currently employed" />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setJobDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSaveJob} variant="contained" disabled={savingJob || !jobForm.companyName || !jobForm.jobRole || !jobForm.employmentTypeId || !jobForm.payFrequencyId || !jobForm.startDate} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {savingJob ? <CircularProgress size={20} color="inherit" /> : selectedJob ? 'Save changes' : 'Add job'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FormDialog
+                open={jobDialogOpen}
+                onCancel={() => setJobDialogOpen(false)}
+                onSave={handleSaveJob}
+                saving={savingJob}
+                title={selectedJob ? 'Edit job' : 'Add job'}
+                saveLabel={selectedJob ? 'Save changes' : 'Add job'}
+                saveDisabled={!jobForm.companyName || !jobForm.jobRole || !jobForm.employmentTypeId || !jobForm.payFrequencyId || !jobForm.startDate}
+            >
+                <TextField label="Company name" value={jobForm.companyName} onChange={(e) => setJobForm({ ...jobForm, companyName: e.target.value })} fullWidth required />
+                <TextField label="Job role" value={jobForm.jobRole} onChange={(e) => setJobForm({ ...jobForm, jobRole: e.target.value })} fullWidth required />
+                <TextField select label="Employment type" value={jobForm.employmentTypeId} onChange={(e) => setJobForm({ ...jobForm, employmentTypeId: e.target.value })} fullWidth required>
+                    {employmentTypes.map((type) => <MenuItem key={type.id} value={type.id}>{type.typeName}</MenuItem>)}
+                </TextField>
+                <TextField select label="Pay frequency" value={jobForm.payFrequencyId} onChange={(e) => setJobForm({ ...jobForm, payFrequencyId: e.target.value })} fullWidth required>
+                    {payFrequencies.map((freq) => <MenuItem key={freq.id} value={freq.id}>{freq.frequencyName}</MenuItem>)}
+                </TextField>
+                <TextField label="Start date" type="date" value={jobForm.startDate} onChange={(e) => setJobForm({ ...jobForm, startDate: e.target.value })} fullWidth required InputLabelProps={{ shrink: true }} />
+                <TextField label="End date" type="date" value={jobForm.endDate} onChange={(e) => setJobForm({ ...jobForm, endDate: e.target.value })} fullWidth InputLabelProps={{ shrink: true }} helperText="Leave empty if currently employed" />
+            </FormDialog>
 
             {/* Job Delete Dialog */}
-            <Dialog open={jobDeleteDialogOpen} onClose={() => setJobDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove job</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        Are you sure you want to remove <strong>{selectedJob?.companyName} — {selectedJob?.jobRole}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setJobDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleDeleteJob} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={jobDeleteDialogOpen}
+                onClose={() => setJobDeleteDialogOpen(false)}
+                onConfirm={handleDeleteJob}
+                title="Remove job"
+                message={<>Are you sure you want to remove <strong>{selectedJob?.companyName} — {selectedJob?.jobRole}</strong>?</>}
+                confirmLabel="Remove"
+            />
 
             {/* Salary Add/Edit Dialog */}
-            <Dialog open={salaryDialogOpen} onClose={() => setSalaryDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>{selectedSalary ? 'Edit salary' : 'Add salary'}</DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-                        <TextField select label="Job" value={salaryForm.employmentId} onChange={(e) => setSalaryForm({ ...salaryForm, employmentId: e.target.value })} fullWidth required>
-                            {employments.map((job) => <MenuItem key={job.id} value={job.id}>{job.companyName} — {job.jobRole}</MenuItem>)}
-                        </TextField>
-                        <TextField label="Net pay" type="number" value={salaryForm.netPay} onChange={(e) => setSalaryForm({ ...salaryForm, netPay: e.target.value })} fullWidth required inputProps={{ min: 0, step: '0.01' }} />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setSalaryDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSaveSalary} variant="contained" disabled={savingSalary || !salaryForm.employmentId || salaryForm.netPay === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {savingSalary ? <CircularProgress size={20} color="inherit" /> : selectedSalary ? 'Save changes' : 'Add salary'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FormDialog
+                open={salaryDialogOpen}
+                onCancel={() => setSalaryDialogOpen(false)}
+                onSave={handleSaveSalary}
+                saving={savingSalary}
+                title={selectedSalary ? 'Edit salary' : 'Add salary'}
+                saveLabel={selectedSalary ? 'Save changes' : 'Add salary'}
+                saveDisabled={!salaryForm.employmentId || salaryForm.netPay === ''}
+            >
+                <TextField select label="Job" value={salaryForm.employmentId} onChange={(e) => setSalaryForm({ ...salaryForm, employmentId: e.target.value })} fullWidth required>
+                    {employments.map((job) => <MenuItem key={job.id} value={job.id}>{job.companyName} — {job.jobRole}</MenuItem>)}
+                </TextField>
+                <TextField label="Net pay" type="number" value={salaryForm.netPay} onChange={(e) => setSalaryForm({ ...salaryForm, netPay: e.target.value })} fullWidth required inputProps={{ min: 0, step: '0.01' }} />
+            </FormDialog>
 
             {/* Salary Delete Dialog */}
-            <Dialog open={salaryDeleteDialogOpen} onClose={() => setSalaryDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove salary</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        Are you sure you want to remove this salary entry for <strong>{selectedSalary?.companyName}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setSalaryDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleDeleteSalary} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={salaryDeleteDialogOpen}
+                onClose={() => setSalaryDeleteDialogOpen(false)}
+                onConfirm={handleDeleteSalary}
+                title="Remove salary"
+                message={<>Are you sure you want to remove this salary entry for <strong>{selectedSalary?.companyName}</strong>?</>}
+                confirmLabel="Remove"
+            />
 
             {/* Deposit Edit Dialog */}
-            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    Edit income — {MONTHS.find(m => m.value === month)?.label} {year}
-                </DialogTitle>
-                <DialogContent>
-                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                            {selectedAccount?.bankName} — {selectedAccount?.accountType}
-                        </Typography>
-                        <TextField label="Deposit" type="number" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} fullWidth inputProps={{ min: 0, step: '0.01' }} />
-                        <TextField label="Interest" type="number" value={form.interest} onChange={(e) => setForm({ ...form, interest: e.target.value })} fullWidth inputProps={{ min: 0, step: '0.01' }} />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSave} variant="contained" disabled={saving || (form.deposit === '' && form.interest === '')} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {saving ? <CircularProgress size={20} color="inherit" /> : 'Save'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FormDialog
+                open={dialogOpen}
+                onCancel={() => setDialogOpen(false)}
+                onSave={handleSave}
+                saving={saving}
+                title={`Edit income — ${MONTHS.find(m => m.value === month)?.label} ${year}`}
+                saveDisabled={form.deposit === '' && form.interest === ''}
+            >
+                <Typography variant="body2" color="text.secondary">
+                    {selectedAccount?.bankName} — {selectedAccount?.accountType}
+                </Typography>
+                <TextField label="Deposit" type="number" value={form.deposit} onChange={(e) => setForm({ ...form, deposit: e.target.value })} fullWidth inputProps={{ min: 0, step: '0.01' }} />
+                <TextField label="Interest" type="number" value={form.interest} onChange={(e) => setForm({ ...form, interest: e.target.value })} fullWidth inputProps={{ min: 0, step: '0.01' }} />
+            </FormDialog>
 
         </PageLayout>
     );

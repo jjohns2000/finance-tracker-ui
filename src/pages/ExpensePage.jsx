@@ -17,6 +17,14 @@ import PageLayout from '../components/PageLayout';
 import PageCard, { hideScrollbar } from '../components/PageCard';
 import CreditCardIcon from '../components/CreditCardIcon';
 import CheckInWidget from '../components/CheckInWidget';
+import DataTable from '../components/ui/DataTable';
+import FormDialog from '../components/ui/FormDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import LoadingState from '../components/ui/LoadingState';
+import SearchField from '../components/ui/SearchField';
+import { MetricCard, TrendIndicator } from '../components/ui/MetricCard';
+import MonthYearPicker, { MONTHS } from '../components/ui/MonthYearPicker';
+import { formatCurrency, formatDate } from '../utils/format';
 import {
     Box,
     Typography,
@@ -24,21 +32,13 @@ import {
     TextField,
     IconButton,
     Tooltip,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     Button,
-    CircularProgress,
     Divider
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import AddIcon from '@mui/icons-material/Add';
-import CountUp from '../components/CountUp';
 import {
     getUserCreditCards,
     getMonthlyCreditCardSummary,
@@ -56,23 +56,45 @@ import {
 import StatementUploader from '../components/StatementUploader';
 import { getActiveEmployments } from '../api/employmentApi';
 
-const MONTHS = [
-    { value: 1,  label: 'January' },
-    { value: 2,  label: 'February' },
-    { value: 3,  label: 'March' },
-    { value: 4,  label: 'April' },
-    { value: 5,  label: 'May' },
-    { value: 6,  label: 'June' },
-    { value: 7,  label: 'July' },
-    { value: 8,  label: 'August' },
-    { value: 9,  label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' }
+const currentYear = new Date().getFullYear();
+
+const ACCOUNT_COLUMNS = [
+    { key: 'bank', label: 'Bank', width: '2fr' },
+    { key: 'type', label: 'Type', width: '1fr' },
+    { key: 'withdrawal', label: 'Withdrawal', width: '1fr' }
 ];
 
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+const RECURRING_COLUMNS = [
+    { key: 'name', label: 'Expense', width: '2fr' },
+    { key: 'default', label: 'Default', width: '1fr' },
+    { key: 'actual', label: 'Actual', width: '1fr' },
+    { key: 'actions', label: '', width: '60px' }
+];
+
+const ONETIME_COLUMNS = [
+    { key: 'name', label: 'Expense', width: '2fr' },
+    { key: 'actual', label: 'Amount', width: '1fr' },
+    { key: 'actions', label: '', width: '60px' }
+];
+
+const CREDIT_CARD_COLUMNS = [
+    { key: 'icon', label: '', width: '56px' },
+    { key: 'name', label: 'Card', width: '2fr' },
+    { key: 'limit', label: 'Limit', width: '1fr' },
+    { key: 'bill', label: 'Bill', width: '1fr' },
+    { key: 'paid', label: 'Paid', width: '1fr' },
+    { key: 'balance', label: 'Balance', width: '1fr' },
+    { key: 'actions', label: '', width: '40px', align: 'right' }
+];
+
+const TRANSACTION_COLUMNS = [
+    { key: 'date', label: 'Date', width: '1fr' },
+    { key: 'details', label: 'Details', width: '2fr' },
+    { key: 'amount', label: 'Amount', width: '1fr' },
+    { key: 'type', label: 'Type', width: '1fr' },
+    { key: 'description', label: 'Description', width: '2fr' },
+    { key: 'actions', label: '', width: '80px', align: 'right' }
+];
 
 const ExpensePage = () => {
     const { showSnackbar } = useSnackbar();
@@ -186,13 +208,12 @@ const ExpensePage = () => {
                     getUserAccounts().catch(() => []),
                     getUserCreditCards().catch(() => []),
                     getPaymentMethods().catch(() => []),
-                    getActiveEmployments(month, year).catch(() => [])  // ← add month, year
+                    getActiveEmployments(month, year).catch(() => [])
                 ]);
                 setAccounts(accs);
                 setCreditCards(cards);
                 setPaymentMethods(methods);
                 setEmployments(emps);
-                console.log('Employments loaded:', emps); // temp debug
             } catch (err) {
                 console.error('Failed to initialize', err);
             }
@@ -281,9 +302,6 @@ const ExpensePage = () => {
         }
     };
 
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
     const sortByAmount = (types) =>
         [...types].sort((a, b) => {
             const aEntry = getEntryForType(a.id);
@@ -299,18 +317,6 @@ const ExpensePage = () => {
     const oneTimeTypes = sortByAmount(
         expenseTypes.filter(t => !t.isRecurring).filter(t => t.expenseName.toLowerCase().includes(oneTimeSearch.toLowerCase()))
     );
-
-    const TrendValue = ({ value }) => {
-        const positive = (value ?? 0) >= 0;
-        return (
-            <Box display="flex" alignItems="center" gap={0.5}>
-                {positive ? <TrendingUpIcon fontSize="small" color="success" /> : <TrendingDownIcon fontSize="small" color="error" />}
-                <Typography variant="body2" fontWeight={600} color={positive ? 'success.main' : 'error.main'}>
-                    <CountUp value={Math.abs(value ?? 0)} prefix="$" duration={1200} />
-                </Typography>
-            </Box>
-        );
-    };
 
     const getCreditCardEntry = (cardId) =>
         monthlyCreditCards.find(m => m.creditCardId === cardId) || null;
@@ -341,23 +347,6 @@ const ExpensePage = () => {
             setSavingCreditCard(false);
         }
     };
-
-    const MetricBox = ({ label, rawValue, color }) => (
-        <Box sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
-            <Typography variant="caption" color="text.secondary">{label}</Typography>
-            <Typography variant="body1" fontWeight={600} mt={0.5} color={color || 'text.primary'}>
-                <CountUp value={rawValue ?? 0} prefix="$" duration={1200} />
-            </Typography>
-        </Box>
-    );
-
-    const ListHeader = ({ columns, gridTemplateColumns }) => (
-        <Box sx={{ display: 'grid', gridTemplateColumns, px: 2, py: 1.5, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-            {columns.map((col, i) => (
-                <Typography key={i} variant="caption" color="text.secondary" fontWeight={600} textAlign="left">{col}</Typography>
-            ))}
-        </Box>
-    );
 
     // ─── Transaction handlers ─────────────────────────────────────
     const handleOpenAddTransaction = () => {
@@ -444,7 +433,6 @@ const ExpensePage = () => {
             });
             showSnackbar('Transfer saved successfully.', 'success');
             setTransactionDialogOpen(false);
-            // Refresh transactions + both account summaries (deposits shift)
             await Promise.all([fetchTransactions(), fetchExpenseData()]);
         } catch (err) {
             showSnackbar('Failed to save transfer.', 'error');
@@ -498,6 +486,149 @@ const ExpensePage = () => {
     const reconciliationMatch   = reconciliationAbsDiff < 0.01;
     const reconciliationHasData = creditTransactionTotal > 0 || ccBillTotal > 0;
 
+    // ─── Cell renderers ─────────────────────────────────────────
+    const renderAccountCell = (account, col) => {
+        const data = getSummaryForAccount(account);
+        switch (col.key) {
+            case 'bank': return <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>;
+            case 'type': return <Typography variant="body2" color="text.secondary" noWrap>{account.accountType}</Typography>;
+            case 'withdrawal': return <Typography variant="body2" fontWeight={600} color="error.main">{formatCurrency(data?.withdrawal)}</Typography>;
+            default: return null;
+        }
+    };
+
+    const renderExpenseTypeCell = (type, col, autoTooltip) => {
+        const entry = getEntryForType(type.id);
+        switch (col.key) {
+            case 'name':
+                return <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>;
+            case 'default':
+                return <Typography variant="body2" color="text.secondary">{formatCurrency(type.amount)}</Typography>;
+            case 'actual':
+                return (
+                    <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
+                        {entry ? formatCurrency(entry.actualAmount) : '—'}
+                    </Typography>
+                );
+            case 'actions':
+                if (type.isSystemManaged || entry?.isSystemManaged) {
+                    return (
+                        <Tooltip title={autoTooltip}>
+                            <Typography variant="caption" color="text.secondary">Auto</Typography>
+                        </Tooltip>
+                    );
+                }
+                return (
+                    <Box display="flex" gap={0.5}>
+                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                            <IconButton size="small" onClick={() => handleOpenExpenseEntry(type)}><EditIcon fontSize="small" /></IconButton>
+                        </Tooltip>
+                        {entry && (
+                            <Tooltip title="Delete entry">
+                                <IconButton size="small" color="error" onClick={() => handleOpenDeleteExpenseEntry(entry)}><DeleteIcon fontSize="small" /></IconButton>
+                            </Tooltip>
+                        )}
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
+
+    const renderRecurringCell = (type, col) => renderExpenseTypeCell(type, col, 'Auto-updated from transactions');
+    const renderOneTimeCell = (type, col) => renderExpenseTypeCell(type, col, 'Auto-updated from credit card entries');
+
+    const renderCreditCardCell = (card, col) => {
+        const entry = getCreditCardEntry(card.id);
+        switch (col.key) {
+            case 'icon':
+                return <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />;
+            case 'name':
+                return <Typography variant="body2" fontWeight={600}>{card.cardName}</Typography>;
+            case 'limit':
+                return <Typography variant="body2" color="text.secondary">{formatCurrency(card.creditLimit)}</Typography>;
+            case 'bill':
+                return (
+                    <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
+                        {entry ? formatCurrency(entry.billAmount) : '—'}
+                    </Typography>
+                );
+            case 'paid':
+                return (
+                    <Typography variant="body2" fontWeight={600} color={entry ? 'success.main' : 'text.secondary'}>
+                        {entry ? formatCurrency(entry.amountPaid) : '—'}
+                    </Typography>
+                );
+            case 'balance':
+                return (
+                    <Typography variant="body2" fontWeight={600} color={entry?.balance > 0 ? 'error.main' : 'text.secondary'}>
+                        {entry ? formatCurrency(entry.balance) : '—'}
+                    </Typography>
+                );
+            case 'actions':
+                return (
+                    <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenCreditCardEntry(card); }}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                );
+            default:
+                return null;
+        }
+    };
+
+    const renderTransactionCell = (transaction, col) => {
+        switch (col.key) {
+            case 'date':
+                return (
+                    <Typography variant="body2" color="text.secondary">
+                        {formatDate(transaction.transactionDate, { month: 'short', day: 'numeric' })}
+                    </Typography>
+                );
+            case 'details':
+                return transaction.isTransfer ? (
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                        <SwapHorizIcon sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                            {transaction.fromAccountName} → {transaction.toAccountName}
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Typography variant="body2" fontWeight={600}>{transaction.expenseName}</Typography>
+                );
+            case 'amount':
+                return (
+                    <Typography variant="body2" fontWeight={600} color={transaction.isTransfer ? 'text.primary' : 'error.main'}>
+                        {formatCurrency(transaction.amount)}
+                    </Typography>
+                );
+            case 'type':
+                return <Typography variant="body2" color="text.secondary">{transaction.isTransfer ? 'Transfer' : transaction.paymentMethod}</Typography>;
+            case 'description':
+                return <Typography variant="body2" color="text.secondary" noWrap>{transaction.description || '—'}</Typography>;
+            case 'actions':
+                return (
+                    <Box display="flex" gap={0.5}>
+                        {!transaction.isTransfer && (
+                            <Tooltip title="Edit">
+                                <IconButton size="small" onClick={() => handleOpenEditTransaction(transaction)}>
+                                    <EditIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteTransaction(transaction)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
+
     return (
         <PageLayout sidebar={<Sidebar />}>
 
@@ -507,14 +638,7 @@ const ExpensePage = () => {
                     <Typography variant="h6" fontWeight={700}>Expense</Typography>
                     <Typography variant="body2" color="text.secondary">Monthly expense overview</Typography>
                 </Box>
-                <Box display="flex" gap={2}>
-                    <TextField select label="Month" value={month} onChange={(e) => setMonth(parseInt(e.target.value))} size="small" sx={{ width: 140 }}>
-                        {MONTHS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
-                    </TextField>
-                    <TextField select label="Year" value={year} onChange={(e) => setYear(parseInt(e.target.value))} size="small" sx={{ width: 100 }}>
-                        {YEARS.map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                    </TextField>
-                </Box>
+                <MonthYearPicker month={month} year={year} onMonthChange={setMonth} onYearChange={setYear} />
             </PageCard>
 
             {/* Section 2 — Expense Check-In */}
@@ -530,18 +654,18 @@ const ExpensePage = () => {
             {/* Section 3 — Aggregate + Contributing Accounts */}
             <PageCard>
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}><CircularProgress size={24} /></Box>
+                    <LoadingState />
                 ) : (
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>Aggregate total</Typography>
                             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                                <MetricBox label="Opening balance"  rawValue={aggregate?.totalOpeningBalance} />
-                                <MetricBox label="Total withdrawal" rawValue={aggregate?.totalWithdrawal}     color="error.main" />
-                                <MetricBox label="Closing balance"  rawValue={aggregate?.totalClosingBalance} />
+                                <MetricCard label="Opening balance"  value={aggregate?.totalOpeningBalance} />
+                                <MetricCard label="Total withdrawal" value={aggregate?.totalWithdrawal}     color="error.main" />
+                                <MetricCard label="Closing balance"  value={aggregate?.totalClosingBalance} />
                                 <Box sx={{ p: 2, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.default' }}>
                                     <Typography variant="caption" color="text.secondary">Trend</Typography>
-                                    <Box mt={0.5}><TrendValue value={aggregate?.totalTrend} /></Box>
+                                    <Box mt={0.5}><TrendIndicator value={aggregate?.totalTrend} /></Box>
                                 </Box>
                             </Box>
                         </Box>
@@ -551,32 +675,15 @@ const ExpensePage = () => {
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>Contributing accounts</Typography>
-                            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', maxHeight: 260, overflowY: 'auto' }}>
-                                <ListHeader columns={['Bank', 'Type', 'Withdrawal']} gridTemplateColumns="2fr 1fr 1fr" />
-                                {accounts.length === 0 ? (
-                                    <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No accounts found.</Typography></Box>
-                                ) : (
-                                    accounts.map((account, index) => {
-                                        const data = getSummaryForAccount(account);
-                                        return (
-                                            <Box
-                                                key={account.publicId}
-                                                onClick={() => handleOpenEdit(account)}
-                                                sx={{
-                                                    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr',
-                                                    px: 2, py: 1.5, alignItems: 'center', cursor: 'pointer',
-                                                    borderBottom: index < accounts.length - 1 ? '1px solid' : 'none',
-                                                    borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' }
-                                                }}
-                                            >
-                                                <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>
-                                                <Typography variant="body2" color="text.secondary" noWrap>{account.accountType}</Typography>
-                                                <Typography variant="body2" fontWeight={600} color="error.main">{formatCurrency(data?.withdrawal)}</Typography>
-                                            </Box>
-                                        );
-                                    })
-                                )}
-                            </Box>
+                            <DataTable
+                                columns={ACCOUNT_COLUMNS}
+                                rows={accounts}
+                                getRowKey={(row) => row.publicId}
+                                renderCell={renderAccountCell}
+                                onRowClick={handleOpenEdit}
+                                emptyMessage="No accounts found."
+                                maxHeight={260}
+                            />
                         </Box>
                     </Box>
                 )}
@@ -591,45 +698,15 @@ const ExpensePage = () => {
                     {/* Recurring */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">Recurring</Typography>
-                        <TextField placeholder="Search recurring..." size="small" fullWidth value={recurringSearch} onChange={(e) => setRecurringSearch(e.target.value)} sx={{ mb: 1 }} inputProps={{ style: { fontSize: 13 } }} />
-                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                            <ListHeader columns={['Expense', 'Default', 'Actual', '']} gridTemplateColumns="2fr 1fr 1fr 60px" />
-                            <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
-                                {recurringTypes.length === 0 ? (
-                                    <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No active recurring expenses.</Typography></Box>
-                                ) : (
-                                    recurringTypes.map((type, index, arr) => {
-                                        const entry = getEntryForType(type.id);
-                                        return (
-                                            <Box key={type.publicId} sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 60px', px: 2, py: 1.5, alignItems: 'center', borderBottom: index < arr.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'background.default' } }}>
-                                                <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>
-                                                <Typography variant="body2" color="text.secondary">{formatCurrency(type.amount)}</Typography>
-                                                <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
-                                                    {entry ? formatCurrency(entry.actualAmount) : '—'}
-                                                </Typography>
-                                                <Box display="flex" justifyContent="flex-start" gap={0.5}>
-                                                    {!type.isSystemManaged && !entry?.isSystemManaged && (
-                                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
-                                                            <IconButton size="small" onClick={() => handleOpenExpenseEntry(type)}><EditIcon fontSize="small" /></IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                    {!type.isSystemManaged && !entry?.isSystemManaged && entry && (
-                                                        <Tooltip title="Delete entry">
-                                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteExpenseEntry(entry)}><DeleteIcon fontSize="small" /></IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                    {(type.isSystemManaged || entry?.isSystemManaged) && (
-                                                        <Tooltip title="Auto-updated from transactions">
-                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Auto</Typography>
-                                                        </Tooltip>
-                                                    )}
-                                                </Box>
-                                            </Box>
-                                        );
-                                    })
-                                )}
-                            </Box>
-                        </Box>
+                        <SearchField placeholder="Search recurring..." value={recurringSearch} onChange={setRecurringSearch} />
+                        <DataTable
+                            columns={RECURRING_COLUMNS}
+                            rows={recurringTypes}
+                            getRowKey={(row) => row.publicId}
+                            renderCell={renderRecurringCell}
+                            emptyMessage="No active recurring expenses."
+                            maxHeight={168}
+                        />
                     </Box>
 
                     <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
@@ -638,44 +715,15 @@ const ExpensePage = () => {
                     {/* One-time */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="caption" color="text.secondary" fontWeight={600} mb={1} display="block">One-time</Typography>
-                        <TextField placeholder="Search one-time..." size="small" fullWidth value={oneTimeSearch} onChange={(e) => setOneTimeSearch(e.target.value)} sx={{ mb: 1 }} inputProps={{ style: { fontSize: 13 } }} />
-                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                            <ListHeader columns={['Expense', 'Amount', '']} gridTemplateColumns="2fr 1fr 60px" />
-                            <Box sx={{ maxHeight: 168, overflowY: 'auto' }}>
-                                {oneTimeTypes.length === 0 ? (
-                                    <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No one-time expense types. Add them in Settings.</Typography></Box>
-                                ) : (
-                                    oneTimeTypes.map((type, index, arr) => {
-                                        const entry = getEntryForType(type.id);
-                                        return (
-                                            <Box key={type.publicId} sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 60px', px: 2, py: 1.5, alignItems: 'center', borderBottom: index < arr.length - 1 ? '1px solid' : 'none', borderColor: 'divider', '&:hover': { bgcolor: 'background.default' } }}>
-                                                <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>
-                                                <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'} sx={type.isSystemManaged ? { fontStyle: 'italic' } : {}}>
-                                                    {entry ? formatCurrency(entry.actualAmount) : '—'}
-                                                </Typography>
-                                                <Box display="flex" justifyContent="flex-start" gap={0.5}>
-                                                    {!type.isSystemManaged && (
-                                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
-                                                            <IconButton size="small" onClick={() => handleOpenExpenseEntry(type)}><EditIcon fontSize="small" /></IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                    {!type.isSystemManaged && entry && (
-                                                        <Tooltip title="Delete entry">
-                                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteExpenseEntry(entry)}><DeleteIcon fontSize="small" /></IconButton>
-                                                        </Tooltip>
-                                                    )}
-                                                    {type.isSystemManaged && (
-                                                        <Tooltip title="Auto-updated from credit card entries">
-                                                            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: 'center' }}>Auto</Typography>
-                                                        </Tooltip>
-                                                    )}
-                                                </Box>
-                                            </Box>
-                                        );
-                                    })
-                                )}
-                            </Box>
-                        </Box>
+                        <SearchField placeholder="Search one-time..." value={oneTimeSearch} onChange={setOneTimeSearch} />
+                        <DataTable
+                            columns={ONETIME_COLUMNS}
+                            rows={oneTimeTypes}
+                            getRowKey={(row) => row.publicId}
+                            renderCell={renderOneTimeCell}
+                            emptyMessage="No one-time expense types. Add them in Settings."
+                            maxHeight={168}
+                        />
                     </Box>
                 </Box>
             </PageCard>
@@ -685,54 +733,14 @@ const ExpensePage = () => {
                 <Typography variant="body2" color="text.secondary" fontWeight={600} mb={2}>
                     Credit cards — {MONTHS.find(m => m.value === month)?.label} {year}
                 </Typography>
-                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '56px 2fr 1fr 1fr 1fr 1fr 40px', px: 2, py: 1.5, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-                        {['', 'Card', 'Limit', 'Bill', 'Paid', 'Balance', ''].map((col, i) => (
-                            <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>{col}</Typography>
-                        ))}
-                    </Box>
-                    {creditCards.length === 0 ? (
-                        <Box px={2} py={3}><Typography variant="body2" color="text.secondary">No credit cards found. Add them in Bank Info.</Typography></Box>
-                    ) : (
-                        creditCards.map((card, index) => {
-                            const entry = getCreditCardEntry(card.id);
-                            return (
-                                <Box
-                                    key={card.publicId}
-                                    onClick={() => handleOpenCreditCardEntry(card)}
-                                    sx={{
-                                        display: 'grid', gridTemplateColumns: '56px 2fr 1fr 1fr 1fr 1fr 40px',
-                                        px: 2, py: 1.5, alignItems: 'center', cursor: 'pointer',
-                                        borderBottom: index < creditCards.length - 1 ? '1px solid' : 'none',
-                                        borderColor: 'divider', '&:hover': { bgcolor: 'action.hover' }
-                                    }}
-                                >
-                                    <Box display="flex" alignItems="center">
-                                        <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />
-                                    </Box>
-                                    <Typography variant="body2" fontWeight={600}>{card.cardName}</Typography>
-                                    <Typography variant="body2" color="text.secondary">{formatCurrency(card.creditLimit)}</Typography>
-                                    <Typography variant="body2" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'}>
-                                        {entry ? formatCurrency(entry.billAmount) : '—'}
-                                    </Typography>
-                                    <Typography variant="body2" fontWeight={600} color={entry ? 'success.main' : 'text.secondary'}>
-                                        {entry ? formatCurrency(entry.amountPaid) : '—'}
-                                    </Typography>
-                                    <Typography variant="body2" fontWeight={600} color={entry?.balance > 0 ? 'error.main' : 'text.secondary'}>
-                                        {entry ? formatCurrency(entry.balance) : '—'}
-                                    </Typography>
-                                    <Box display="flex" justifyContent="flex-end">
-                                        <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
-                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenCreditCardEntry(card); }}>
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Box>
-                                </Box>
-                            );
-                        })
-                    )}
-                </Box>
+                <DataTable
+                    columns={CREDIT_CARD_COLUMNS}
+                    rows={creditCards}
+                    getRowKey={(row) => row.publicId}
+                    renderCell={renderCreditCardCell}
+                    onRowClick={handleOpenCreditCardEntry}
+                    emptyMessage="No credit cards found. Add them in Bank Info."
+                />
 
                 {/* Reconciliation summary */}
                 {reconciliationHasData && (
@@ -777,7 +785,7 @@ const ExpensePage = () => {
                             accounts={accounts}
                             creditCards={creditCards}
                             expenseTypes={expenseTypes}
-                            employments={employments}  
+                            employments={employments}
                             onImported={async () => {
                                 await Promise.all([
                                     fetchTransactions(),
@@ -798,355 +806,243 @@ const ExpensePage = () => {
                         </Button>
                     </Box>
                 </Box>
-                <TextField placeholder="Search transactions..." size="small" fullWidth value={transactionSearch} onChange={(e) => setTransactionSearch(e.target.value)} sx={{ mb: 1.5 }} inputProps={{ style: { fontSize: 13 } }} />
-                <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px', px: 2, py: 1.5, bgcolor: 'background.default', borderBottom: '1px solid', borderColor: 'divider' }}>
-                        {['Date', 'Details', 'Amount', 'Type', 'Description', ''].map((col, i) => (
-                            <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>{col}</Typography>
-                        ))}
-                    </Box>
-                    <Box sx={{ maxHeight: 280, overflowY: 'auto', ...hideScrollbar }}>
-                        {filteredTransactions.length === 0 ? (
-                            <Box px={2} py={3}>
-                                <Typography variant="body2" color="text.secondary">
-                                    {transactionSearch
-                                        ? 'No transactions match your search.'
-                                        : 'No transactions for this month. Click Add transaction to get started.'
-                                    }
-                                </Typography>
-                            </Box>
-                        ) : (
-                            filteredTransactions.map((transaction, index) => (
-                                <Box
-                                    key={transaction.publicId}
-                                    sx={{
-                                        display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 1fr 2fr 80px',
-                                        px: 2, py: 1.5, alignItems: 'center',
-                                        borderBottom: index < filteredTransactions.length - 1 ? '1px solid' : 'none',
-                                        borderColor: 'divider', '&:hover': { bgcolor: 'background.default' }
-                                    }}
-                                >
-                                    <Typography variant="body2" color="text.secondary">
-                                        {new Date(transaction.transactionDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
-                                    </Typography>
-
-                                    {transaction.isTransfer ? (
-                                        <Box display="flex" alignItems="center" gap={0.5}>
-                                            <SwapHorizIcon sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
-                                            <Typography variant="body2" color="text.secondary" noWrap>
-                                                {transaction.fromAccountName} → {transaction.toAccountName}
-                                            </Typography>
-                                        </Box>
-                                    ) : (
-                                        <Typography variant="body2" fontWeight={600}>{transaction.expenseName}</Typography>
-                                    )}
-
-                                    <Typography variant="body2" fontWeight={600} color={transaction.isTransfer ? 'text.primary' : 'error.main'}>
-                                        {formatCurrency(transaction.amount)}
-                                    </Typography>
-
-                                    <Typography variant="body2" color="text.secondary">
-                                        {transaction.isTransfer ? 'Transfer' : transaction.paymentMethod}
-                                    </Typography>
-
-                                    <Typography variant="body2" color="text.secondary" noWrap>
-                                        {transaction.description || '—'}
-                                    </Typography>
-
-                                    <Box display="flex" justifyContent="flex-end" gap={0.5}>
-                                        {!transaction.isTransfer && (
-                                            <Tooltip title="Edit">
-                                                <IconButton size="small" onClick={() => handleOpenEditTransaction(transaction)}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-                                        <Tooltip title="Delete">
-                                            <IconButton size="small" color="error" onClick={() => handleOpenDeleteTransaction(transaction)}>
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Box>
-                                </Box>
-                            ))
-                        )}
-                    </Box>
-                </Box>
+                <SearchField placeholder="Search transactions..." value={transactionSearch} onChange={setTransactionSearch} sx={{ mb: 1.5 }} />
+                <DataTable
+                    columns={TRANSACTION_COLUMNS}
+                    rows={filteredTransactions}
+                    getRowKey={(row) => row.publicId}
+                    renderCell={renderTransactionCell}
+                    emptyMessage={transactionSearch ? 'No transactions match your search.' : 'No transactions for this month. Click Add transaction to get started.'}
+                    maxHeight={280}
+                    bodySx={hideScrollbar}
+                />
             </PageCard>
 
             {/* ─── Add Transaction / Transfer Dialog ─────────────── */}
-            <Dialog
+            <FormDialog
                 open={transactionDialogOpen}
-                onClose={() => setTransactionDialogOpen(false)}
-                fullWidth maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                onCancel={() => setTransactionDialogOpen(false)}
+                onSave={transactionType === 'transfer' && !selectedTransaction ? handleSaveTransfer : handleSaveTransaction}
+                saving={savingTransaction}
+                title={selectedTransaction ? 'Edit transaction' : 'Add transaction'}
+                saveLabel={selectedTransaction ? 'Save changes' : transactionType === 'transfer' ? 'Transfer' : 'Add'}
+                saveDisabled={
+                    transactionType === 'transfer' && !selectedTransaction
+                        ? (!transferForm.transactionDate || !transferForm.fromAccountId || !transferForm.toAccountId || !transferForm.amount)
+                        : (!transactionForm.transactionDate || !transactionForm.expenseTypeId || !transactionForm.amount || !transactionForm.paymentMethodId)
+                }
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {selectedTransaction ? 'Edit transaction' : 'Add transaction'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
-
-                        {/* Type toggle — only when adding new */}
-                        {!selectedTransaction && (
-                            <Box display="flex" gap={1}>
-                                {['expense', 'transfer'].map((type) => (
-                                    <Button
-                                        key={type}
-                                        variant={transactionType === type ? 'contained' : 'outlined'}
-                                        size="small"
-                                        onClick={() => setTransactionType(type)}
-                                        sx={{ borderRadius: 2, textTransform: 'none', flex: 1 }}
-                                    >
-                                        {type === 'expense' ? 'Expense' : '↔ Transfer'}
-                                    </Button>
-                                ))}
-                            </Box>
-                        )}
-
-                        {/* Expense fields */}
-                        {(selectedTransaction || transactionType === 'expense') && (
-                            <>
-                                <TextField
-                                    label="Transaction date" type="date"
-                                    value={transactionForm.transactionDate}
-                                    onChange={(e) => setTransactionForm({ ...transactionForm, transactionDate: e.target.value })}
-                                    fullWidth required InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    select label="Expense type"
-                                    value={transactionForm.expenseTypeId}
-                                    onChange={(e) => setTransactionForm({ ...transactionForm, expenseTypeId: e.target.value })}
-                                    fullWidth required
-                                >
-                                    {expenseTypes.filter(t => !t.isRecurring).map((type) => (
-                                        <MenuItem key={type.id} value={type.id}>{type.expenseName}</MenuItem>
-                                    ))}
-                                </TextField>
-                                <TextField
-                                    label="Amount" type="number"
-                                    value={transactionForm.amount}
-                                    onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
-                                    fullWidth required inputProps={{ min: 0, step: '0.01' }}
-                                />
-                                <TextField
-                                    select label="Payment method"
-                                    value={transactionForm.paymentMethodId}
-                                    onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethodId: e.target.value })}
-                                    fullWidth required
-                                >
-                                    {paymentMethods.map((method) => (
-                                        <MenuItem key={method.id} value={method.id}>{method.methodName}</MenuItem>
-                                    ))}
-                                </TextField>
-                                <TextField
-                                    label="Description"
-                                    value={transactionForm.description}
-                                    onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
-                                    fullWidth multiline rows={2} placeholder="Optional note"
-                                />
-                            </>
-                        )}
-
-                        {/* Transfer fields */}
-                        {!selectedTransaction && transactionType === 'transfer' && (
-                            <>
-                                <TextField
-                                    label="Transfer date" type="date"
-                                    value={transferForm.transactionDate}
-                                    onChange={(e) => setTransferForm({ ...transferForm, transactionDate: e.target.value })}
-                                    fullWidth required InputLabelProps={{ shrink: true }}
-                                />
-                                <TextField
-                                    select label="From account"
-                                    value={transferForm.fromAccountId}
-                                    onChange={(e) => setTransferForm({
-                                        ...transferForm,
-                                        fromAccountId: e.target.value,
-                                        // clear toAccountId if it matches new fromAccountId
-                                        toAccountId: transferForm.toAccountId === e.target.value ? '' : transferForm.toAccountId
-                                    })}
-                                    fullWidth required
-                                >
-                                    {accounts.map((account) => (
-                                        <MenuItem key={account.publicId} value={account.publicId}>
-                                            {account.bankName} ({account.accountType})
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-                                <TextField
-                                    select label="To account"
-                                    value={transferForm.toAccountId}
-                                    onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
-                                    fullWidth required
-                                >
-                                    {accounts
-                                        .filter(a => a.publicId !== transferForm.fromAccountId)
-                                        .map((account) => (
-                                            <MenuItem key={account.publicId} value={account.publicId}>
-                                                {account.bankName} ({account.accountType})
-                                            </MenuItem>
-                                        ))}
-                                </TextField>
-                                <TextField
-                                    label="Amount" type="number"
-                                    value={transferForm.amount}
-                                    onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
-                                    fullWidth required inputProps={{ min: 0, step: '0.01' }}
-                                />
-                                <TextField
-                                    label="Description"
-                                    value={transferForm.description}
-                                    onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
-                                    fullWidth multiline rows={2} placeholder="Optional note"
-                                />
-                            </>
-                        )}
+                {/* Type toggle — only when adding new */}
+                {!selectedTransaction && (
+                    <Box display="flex" gap={1}>
+                        {['expense', 'transfer'].map((type) => (
+                            <Button
+                                key={type}
+                                variant={transactionType === type ? 'contained' : 'outlined'}
+                                size="small"
+                                onClick={() => setTransactionType(type)}
+                                sx={{ borderRadius: 2, textTransform: 'none', flex: 1 }}
+                            >
+                                {type === 'expense' ? 'Expense' : '↔ Transfer'}
+                            </Button>
+                        ))}
                     </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setTransactionDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button
-                        onClick={transactionType === 'transfer' && !selectedTransaction
-                            ? handleSaveTransfer
-                            : handleSaveTransaction
-                        }
-                        variant="contained"
-                        disabled={
-                            savingTransaction || (
-                                transactionType === 'transfer' && !selectedTransaction
-                                    ? (!transferForm.transactionDate || !transferForm.fromAccountId || !transferForm.toAccountId || !transferForm.amount)
-                                    : (!transactionForm.transactionDate || !transactionForm.expenseTypeId || !transactionForm.amount || !transactionForm.paymentMethodId)
-                            )
-                        }
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {savingTransaction
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedTransaction ? 'Save changes' : transactionType === 'transfer' ? 'Transfer' : 'Add'
-                        }
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                )}
 
-            {/* ─── Delete Dialog ──────────────────────────────────── */}
-            <Dialog
-                open={transactionDeleteDialogOpen}
-                onClose={() => setTransactionDeleteDialogOpen(false)}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {selectedTransaction?.isTransfer ? 'Remove transfer' : 'Remove transaction'}
-                </DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        {selectedTransaction?.isTransfer
-                            ? <>Are you sure you want to remove this transfer of <strong>{formatCurrency(selectedTransaction?.amount)}</strong>? Both account balances will be reversed.</>
-                            : <>Are you sure you want to remove this transaction for <strong>{selectedTransaction?.expenseName}</strong> — <strong>{formatCurrency(selectedTransaction?.amount)}</strong>?</>
-                        }
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setTransactionDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleDeleteTransaction} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* ─── Withdrawal Edit Dialog ─────────────────────────── */}
-            <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>Edit expense — {MONTHS.find(m => m.value === month)?.label} {year}</DialogTitle>
-                <DialogContent>
-                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                            {selectedAccount?.bankName} — {selectedAccount?.accountType}
-                        </Typography>
+                {/* Expense fields */}
+                {(selectedTransaction || transactionType === 'expense') && (
+                    <>
                         <TextField
-                            label="Withdrawal" type="number"
-                            value={form.withdrawal}
-                            onChange={(e) => setForm({ withdrawal: e.target.value })}
-                            fullWidth inputProps={{ min: 0, step: '0.01' }}
+                            label="Transaction date" type="date"
+                            value={transactionForm.transactionDate}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, transactionDate: e.target.value })}
+                            fullWidth required InputLabelProps={{ shrink: true }}
                         />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSave} variant="contained" disabled={saving || form.withdrawal === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {saving ? <CircularProgress size={20} color="inherit" /> : 'Save'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* ─── Expense Entry Add/Edit Dialog ─────────────────── */}
-            <Dialog open={expenseDialogOpen} onClose={() => setExpenseDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>{selectedEntry ? 'Edit expense entry' : 'Add expense entry'}</DialogTitle>
-                <DialogContent>
-                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                            {selectedExpenseType?.expenseName} — {MONTHS.find(m => m.value === month)?.label} {year}
-                        </Typography>
+                        <TextField
+                            select label="Expense type"
+                            value={transactionForm.expenseTypeId}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, expenseTypeId: e.target.value })}
+                            fullWidth required
+                        >
+                            {expenseTypes.filter(t => !t.isRecurring).map((type) => (
+                                <MenuItem key={type.id} value={type.id}>{type.expenseName}</MenuItem>
+                            ))}
+                        </TextField>
                         <TextField
                             label="Amount" type="number"
-                            value={expenseForm.actualAmount}
-                            onChange={(e) => setExpenseForm({ actualAmount: e.target.value })}
+                            value={transactionForm.amount}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
                             fullWidth required inputProps={{ min: 0, step: '0.01' }}
                         />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setExpenseDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSaveExpenseEntry} variant="contained" disabled={savingExpense || expenseForm.actualAmount === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {savingExpense ? <CircularProgress size={20} color="inherit" /> : selectedEntry ? 'Save changes' : 'Add'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                        <TextField
+                            select label="Payment method"
+                            value={transactionForm.paymentMethodId}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, paymentMethodId: e.target.value })}
+                            fullWidth required
+                        >
+                            {paymentMethods.map((method) => (
+                                <MenuItem key={method.id} value={method.id}>{method.methodName}</MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            label="Description"
+                            value={transactionForm.description}
+                            onChange={(e) => setTransactionForm({ ...transactionForm, description: e.target.value })}
+                            fullWidth multiline rows={2} placeholder="Optional note"
+                        />
+                    </>
+                )}
+
+                {/* Transfer fields */}
+                {!selectedTransaction && transactionType === 'transfer' && (
+                    <>
+                        <TextField
+                            label="Transfer date" type="date"
+                            value={transferForm.transactionDate}
+                            onChange={(e) => setTransferForm({ ...transferForm, transactionDate: e.target.value })}
+                            fullWidth required InputLabelProps={{ shrink: true }}
+                        />
+                        <TextField
+                            select label="From account"
+                            value={transferForm.fromAccountId}
+                            onChange={(e) => setTransferForm({
+                                ...transferForm,
+                                fromAccountId: e.target.value,
+                                toAccountId: transferForm.toAccountId === e.target.value ? '' : transferForm.toAccountId
+                            })}
+                            fullWidth required
+                        >
+                            {accounts.map((account) => (
+                                <MenuItem key={account.publicId} value={account.publicId}>
+                                    {account.bankName} ({account.accountType})
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                        <TextField
+                            select label="To account"
+                            value={transferForm.toAccountId}
+                            onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
+                            fullWidth required
+                        >
+                            {accounts
+                                .filter(a => a.publicId !== transferForm.fromAccountId)
+                                .map((account) => (
+                                    <MenuItem key={account.publicId} value={account.publicId}>
+                                        {account.bankName} ({account.accountType})
+                                    </MenuItem>
+                                ))}
+                        </TextField>
+                        <TextField
+                            label="Amount" type="number"
+                            value={transferForm.amount}
+                            onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
+                            fullWidth required inputProps={{ min: 0, step: '0.01' }}
+                        />
+                        <TextField
+                            label="Description"
+                            value={transferForm.description}
+                            onChange={(e) => setTransferForm({ ...transferForm, description: e.target.value })}
+                            fullWidth multiline rows={2} placeholder="Optional note"
+                        />
+                    </>
+                )}
+            </FormDialog>
+
+            {/* ─── Delete Dialog ──────────────────────────────────── */}
+            <ConfirmDialog
+                open={transactionDeleteDialogOpen}
+                onClose={() => setTransactionDeleteDialogOpen(false)}
+                onConfirm={handleDeleteTransaction}
+                title={selectedTransaction?.isTransfer ? 'Remove transfer' : 'Remove transaction'}
+                message={
+                    selectedTransaction?.isTransfer
+                        ? <>Are you sure you want to remove this transfer of <strong>{formatCurrency(selectedTransaction?.amount)}</strong>? Both account balances will be reversed.</>
+                        : <>Are you sure you want to remove this transaction for <strong>{selectedTransaction?.expenseName}</strong> — <strong>{formatCurrency(selectedTransaction?.amount)}</strong>?</>
+                }
+                confirmLabel="Remove"
+            />
+
+            {/* ─── Withdrawal Edit Dialog ─────────────────────────── */}
+            <FormDialog
+                open={dialogOpen}
+                onCancel={() => setDialogOpen(false)}
+                onSave={handleSave}
+                saving={saving}
+                title={`Edit expense — ${MONTHS.find(m => m.value === month)?.label} ${year}`}
+                saveDisabled={form.withdrawal === ''}
+            >
+                <Typography variant="body2" color="text.secondary">
+                    {selectedAccount?.bankName} — {selectedAccount?.accountType}
+                </Typography>
+                <TextField
+                    label="Withdrawal" type="number"
+                    value={form.withdrawal}
+                    onChange={(e) => setForm({ withdrawal: e.target.value })}
+                    fullWidth inputProps={{ min: 0, step: '0.01' }}
+                />
+            </FormDialog>
+
+            {/* ─── Expense Entry Add/Edit Dialog ─────────────────── */}
+            <FormDialog
+                open={expenseDialogOpen}
+                onCancel={() => setExpenseDialogOpen(false)}
+                onSave={handleSaveExpenseEntry}
+                saving={savingExpense}
+                title={selectedEntry ? 'Edit expense entry' : 'Add expense entry'}
+                saveLabel={selectedEntry ? 'Save changes' : 'Add'}
+                saveDisabled={expenseForm.actualAmount === ''}
+            >
+                <Typography variant="body2" color="text.secondary">
+                    {selectedExpenseType?.expenseName} — {MONTHS.find(m => m.value === month)?.label} {year}
+                </Typography>
+                <TextField
+                    label="Amount" type="number"
+                    value={expenseForm.actualAmount}
+                    onChange={(e) => setExpenseForm({ actualAmount: e.target.value })}
+                    fullWidth required inputProps={{ min: 0, step: '0.01' }}
+                />
+            </FormDialog>
 
             {/* ─── Expense Entry Delete Dialog ───────────────────── */}
-            <Dialog open={expenseEntryDeleteDialogOpen} onClose={() => setExpenseEntryDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove expense entry</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        Are you sure you want to remove this entry for <strong>{selectedEntry?.expenseName}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setExpenseEntryDeleteDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleDeleteExpenseEntry} variant="contained" color="error" sx={{ borderRadius: 2, textTransform: 'none' }}>Remove</Button>
-                </DialogActions>
-            </Dialog>
+            <ConfirmDialog
+                open={expenseEntryDeleteDialogOpen}
+                onClose={() => setExpenseEntryDeleteDialogOpen(false)}
+                onConfirm={handleDeleteExpenseEntry}
+                title="Remove expense entry"
+                message={<>Are you sure you want to remove this entry for <strong>{selectedEntry?.expenseName}</strong>?</>}
+                confirmLabel="Remove"
+            />
 
             {/* ─── Credit Card Entry Dialog ───────────────────────── */}
-            <Dialog open={creditCardDialogOpen} onClose={() => setCreditCardDialogOpen(false)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3, p: 1 } }}>
-                <DialogTitle sx={{ fontWeight: 700 }}>{selectedCreditCardEntry ? 'Edit credit card entry' : 'Add credit card entry'}</DialogTitle>
-                <DialogContent>
-                    <Box mt={1} display="flex" flexDirection="column" gap={2}>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                            <CreditCardIcon color={selectedCreditCard?.cardColor || '#f44336'} size="md" />
-                            <Typography variant="body2" color="text.secondary">
-                                {selectedCreditCard?.cardName} — {MONTHS.find(m => m.value === month)?.label} {year}
-                            </Typography>
-                        </Box>
-                        <TextField
-                            label="Bill amount" type="number"
-                            value={creditCardForm.billAmount}
-                            onChange={(e) => setCreditCardForm({ ...creditCardForm, billAmount: e.target.value })}
-                            fullWidth required inputProps={{ min: 0, step: '0.01' }}
-                        />
-                        <TextField
-                            label="Amount paid" type="number"
-                            value={creditCardForm.amountPaid}
-                            onChange={(e) => setCreditCardForm({ ...creditCardForm, amountPaid: e.target.value })}
-                            fullWidth inputProps={{ min: 0, step: '0.01' }}
-                            helperText="Leave as 0 if not yet paid"
-                        />
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button onClick={() => setCreditCardDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
-                    <Button onClick={handleSaveCreditCardEntry} variant="contained" disabled={savingCreditCard || creditCardForm.billAmount === ''} sx={{ borderRadius: 2, textTransform: 'none' }}>
-                        {savingCreditCard ? <CircularProgress size={20} color="inherit" /> : selectedCreditCardEntry ? 'Save changes' : 'Add'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FormDialog
+                open={creditCardDialogOpen}
+                onCancel={() => setCreditCardDialogOpen(false)}
+                onSave={handleSaveCreditCardEntry}
+                saving={savingCreditCard}
+                title={selectedCreditCardEntry ? 'Edit credit card entry' : 'Add credit card entry'}
+                saveLabel={selectedCreditCardEntry ? 'Save changes' : 'Add'}
+                saveDisabled={creditCardForm.billAmount === ''}
+            >
+                <Box display="flex" alignItems="center" gap={1.5}>
+                    <CreditCardIcon color={selectedCreditCard?.cardColor || '#f44336'} size="md" />
+                    <Typography variant="body2" color="text.secondary">
+                        {selectedCreditCard?.cardName} — {MONTHS.find(m => m.value === month)?.label} {year}
+                    </Typography>
+                </Box>
+                <TextField
+                    label="Bill amount" type="number"
+                    value={creditCardForm.billAmount}
+                    onChange={(e) => setCreditCardForm({ ...creditCardForm, billAmount: e.target.value })}
+                    fullWidth required inputProps={{ min: 0, step: '0.01' }}
+                />
+                <TextField
+                    label="Amount paid" type="number"
+                    value={creditCardForm.amountPaid}
+                    onChange={(e) => setCreditCardForm({ ...creditCardForm, amountPaid: e.target.value })}
+                    fullWidth inputProps={{ min: 0, step: '0.01' }}
+                    helperText="Leave as 0 if not yet paid"
+                />
+            </FormDialog>
 
         </PageLayout>
     );

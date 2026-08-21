@@ -10,19 +10,19 @@ import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import PageCard from '../components/PageCard';
 import SectionHeader from '../pages/SectionHeader';
+import DataTable from '../components/ui/DataTable';
+import FormDialog from '../components/ui/FormDialog';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import LoadingState from '../components/ui/LoadingState';
+import { formatCurrency, formatDate } from '../utils/format';
 import {
     Box,
     Typography,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     TextField,
     IconButton,
     Tooltip,
     Chip,
-    CircularProgress,
     FormControlLabel,
     Switch,
     Checkbox
@@ -39,6 +39,15 @@ const emptyForm = {
     endDate: '',
     isAnnual: false
 };
+
+const COLUMNS = [
+    { key: 'name', label: 'Name', width: '2fr', align: 'left' },
+    { key: 'type', label: 'Type', width: '1fr', align: 'right' },
+    { key: 'amount', label: 'Amount', width: '1fr', align: 'right' },
+    { key: 'start', label: 'Start', width: '1fr', align: 'right' },
+    { key: 'end', label: 'End', width: '1fr', align: 'right' },
+    { key: 'actions', label: '', width: '80px', align: 'right' }
+];
 
 const SettingsPage = () => {
     const { showSnackbar } = useSnackbar();
@@ -163,26 +172,54 @@ const SettingsPage = () => {
         }
     };
 
-    const formatCurrency = (value) =>
-        `$${(value ?? 0).toLocaleString('en-CA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        })}`;
-
-    const formatDate = (date) => {
-        if (!date) return '—';
-        return new Date(date).toLocaleDateString('en-CA', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
-
     const filteredTypes = expenseTypes.filter(t => {
         if (filter === 'recurring') return t.isRecurring;
         if (filter === 'onetime') return !t.isRecurring;
         return true;
     });
+
+    const renderCell = (type, col) => {
+        switch (col.key) {
+            case 'name':
+                return <Typography variant="body2" fontWeight={600}>{type.expenseName}</Typography>;
+            case 'type':
+                return (
+                    <Chip
+                        label={type.isRecurring ? 'Recurring' : 'One-time'}
+                        size="small"
+                        color={type.isRecurring ? 'primary' : 'default'}
+                        sx={{ borderRadius: 1.5 }}
+                    />
+                );
+            case 'amount':
+                return <Typography variant="body2">{formatCurrency(type.amount)}</Typography>;
+            case 'start':
+                return <Typography variant="body2" color="text.secondary">{formatDate(type.startDate)}</Typography>;
+            case 'end':
+                return <Typography variant="body2" color="text.secondary">{formatDate(type.endDate)}</Typography>;
+            case 'actions':
+                return type.isSystemManaged ? (
+                    <Tooltip title="Auto-managed by system">
+                        <Typography variant="caption" color="text.secondary">Auto</Typography>
+                    </Tooltip>
+                ) : (
+                    <Box display="flex" gap={0.5}>
+                        <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => handleOpenEdit(type)}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => handleOpenDelete(type)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                );
+            default:
+                return null;
+        }
+    };
 
     return (
         <PageLayout sidebar={<Sidebar />}>
@@ -227,251 +264,105 @@ const SettingsPage = () => {
                 </Box>
 
                 {loading ? (
-                    <Box display="flex" justifyContent="center" py={4}>
-                        <CircularProgress size={24} />
-                    </Box>
-                ) : filteredTypes.length === 0 ? (
-                    <Box display="flex" alignItems="center" justifyContent="center" py={4}>
-                        <Typography variant="body2" color="text.secondary">
-                            No expense types found. Click Add expense type to get started.
-                        </Typography>
-                    </Box>
+                    <LoadingState />
                 ) : (
-                    <Box
-                        sx={{
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            maxHeight: 400,
-                            overflowY: 'auto'
-                        }}
-                    >
-                        {/* Header */}
-                        <Box
-                            sx={{
-                                display: 'grid',
-                                gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
-                                px: 2,
-                                py: 1.5,
-                                bgcolor: 'background.default',
-                                borderBottom: '1px solid',
-                                borderColor: 'divider'
-                            }}
-                        >
-                            {['Name', 'Type', 'Amount', 'Start', 'End', ''].map((col, i) => (
-                                <Typography
-                                    key={i}
-                                    variant="caption"
-                                    color="text.secondary"
-                                    fontWeight={600}
-                                    textAlign={i === 0 ? 'left' : 'right'}
-                                >
-                                    {col}
-                                </Typography>
-                            ))}
-                        </Box>
-
-                        {/* Rows */}
-                        {filteredTypes.map((type, index) => (
-                            <Box
-                                key={type.publicId}
-                                sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr 80px',
-                                    px: 2,
-                                    py: 1.5,
-                                    alignItems: 'center',
-                                    borderBottom: index < filteredTypes.length - 1
-                                        ? '1px solid' : 'none',
-                                    borderColor: 'divider',
-                                    '&:hover': { bgcolor: 'background.default' }
-                                }}
-                            >
-                                <Typography variant="body2" fontWeight={600}>
-                                    {type.expenseName}
-                                </Typography>
-                                <Box display="flex" justifyContent="flex-end">
-                                    <Chip
-                                        label={type.isRecurring ? 'Recurring' : 'One-time'}
-                                        size="small"
-                                        color={type.isRecurring ? 'primary' : 'default'}
-                                        sx={{ borderRadius: 1.5 }}
-                                    />
-                                </Box>
-                                <Typography variant="body2" textAlign="right">
-                                    {formatCurrency(type.amount)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="text.secondary">
-                                    {formatDate(type.startDate)}
-                                </Typography>
-                                <Typography variant="body2" textAlign="right" color="text.secondary">
-                                    {formatDate(type.endDate)}
-                                </Typography>
-                                <Box display="flex" justifyContent="flex-end" gap={0.5}>
-                                    {!type.isSystemManaged && (
-                                        <Tooltip title="Edit">
-                                            <IconButton size="small" onClick={() => handleOpenEdit(type)}>
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                    {!type.isSystemManaged && (
-                                        <Tooltip title="Delete">
-                                            <IconButton size="small" color="error" onClick={() => handleOpenDelete(type)}>
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                    {type.isSystemManaged && (
-                                        <Tooltip title="Auto-managed by system">
-                                            <Typography variant="caption" color="text.secondary" sx={{ pr: 1, alignSelf: 'center' }}>
-                                                Auto
-                                            </Typography>
-                                        </Tooltip>
-                                    )}
-                                </Box>
-                            </Box>
-                        ))}
-                    </Box>
+                    <DataTable
+                        columns={COLUMNS}
+                        rows={filteredTypes}
+                        renderCell={renderCell}
+                        emptyMessage="No expense types found. Click Add expense type to get started."
+                        maxHeight={400}
+                    />
                 )}
             </PageCard>
 
             {/* Add / Edit Dialog */}
-            <Dialog
+            <FormDialog
                 open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                onCancel={() => setDialogOpen(false)}
+                onSave={handleSave}
+                saving={saving}
+                title={selectedExpenseType ? 'Edit expense type' : 'Add expense type'}
+                saveLabel={selectedExpenseType ? 'Save changes' : 'Add'}
+                saveDisabled={
+                    !form.expenseName ||
+                    (form.isRecurring && (form.amount === '' || !form.startDate))
+                }
             >
-                <DialogTitle sx={{ fontWeight: 700 }}>
-                    {selectedExpenseType ? 'Edit expense type' : 'Add expense type'}
-                </DialogTitle>
-                <DialogContent>
-                    <Box display="flex" flexDirection="column" gap={2} mt={1}>
+                <TextField
+                    label="Expense name"
+                    value={form.expenseName}
+                    onChange={(e) => setForm({ ...form, expenseName: e.target.value })}
+                    fullWidth
+                    required
+                />
+                <TextField
+                    label="Default amount"
+                    type="number"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    fullWidth
+                    required={form.isRecurring}
+                    inputProps={{ min: 0, step: '0.01' }}
+                    helperText={form.isRecurring ? 'Required for recurring expenses' : 'Optional'}
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={form.isRecurring}
+                            onChange={(e) => setForm({
+                                ...form,
+                                isRecurring: e.target.checked,
+                                startDate: '',
+                                endDate: '',
+                                isAnnual: false
+                            })}
+                        />
+                    }
+                    label="Recurring expense"
+                />
+                {form.isRecurring && (
+                    <>
                         <TextField
-                            label="Expense name"
-                            value={form.expenseName}
-                            onChange={(e) => setForm({ ...form, expenseName: e.target.value })}
+                            label="Start date"
+                            type="date"
+                            value={form.startDate}
+                            onChange={(e) => handleStartDateChange(e.target.value)}
                             fullWidth
                             required
-                        />
-                        <TextField
-                            label="Default amount"
-                            type="number"
-                            value={form.amount}
-                            onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                            fullWidth
-                            required={form.isRecurring}
-                            inputProps={{ min: 0, step: '0.01' }}
-                            helperText={form.isRecurring ? 'Required for recurring expenses' : 'Optional'}
+                            InputLabelProps={{ shrink: true }}
                         />
                         <FormControlLabel
                             control={
-                                <Switch
-                                    checked={form.isRecurring}
-                                    onChange={(e) => setForm({
-                                        ...form,
-                                        isRecurring: e.target.checked,
-                                        startDate: '',
-                                        endDate: '',
-                                        isAnnual: false
-                                    })}
+                                <Checkbox
+                                    checked={form.isAnnual}
+                                    onChange={(e) => handleAnnualChange(e.target.checked)}
                                 />
                             }
-                            label="Recurring expense"
+                            label="Annual subscription (auto-fills end date)"
                         />
-                        {form.isRecurring && (
-                            <>
-                                <TextField
-                                    label="Start date"
-                                    type="date"
-                                    value={form.startDate}
-                                    onChange={(e) => handleStartDateChange(e.target.value)}
-                                    fullWidth
-                                    required
-                                    InputLabelProps={{ shrink: true }}
-                                />
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={form.isAnnual}
-                                            onChange={(e) => handleAnnualChange(e.target.checked)}
-                                        />
-                                    }
-                                    label="Annual subscription (auto-fills end date)"
-                                />
-                                <TextField
-                                    label="End date"
-                                    type="date"
-                                    value={form.endDate}
-                                    onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                                    fullWidth
-                                    InputLabelProps={{ shrink: true }}
-                                    helperText="Leave empty if no end date"
-                                />
-                            </>
-                        )}
-                    </Box>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleSave}
-                        variant="contained"
-                        disabled={
-                            saving ||
-                            !form.expenseName ||
-                            (form.isRecurring && (form.amount === '' || !form.startDate))
-                        }
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        {saving
-                            ? <CircularProgress size={20} color="inherit" />
-                            : selectedExpenseType ? 'Save changes' : 'Add'
-                        }
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                        <TextField
+                            label="End date"
+                            type="date"
+                            value={form.endDate}
+                            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            helperText="Leave empty if no end date"
+                        />
+                    </>
+                )}
+            </FormDialog>
 
             {/* Delete Dialog */}
-            <Dialog
+            <ConfirmDialog
                 open={deleteDialogOpen}
                 onClose={() => setDeleteDialogOpen(false)}
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
-            >
-                <DialogTitle sx={{ fontWeight: 700 }}>Remove expense type</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary">
-                        Are you sure you want to remove{' '}
-                        <strong>{selectedExpenseType?.expenseName}</strong>?
-                    </Typography>
-                </DialogContent>
-                <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
-                    <Button
-                        onClick={() => setDeleteDialogOpen(false)}
-                        variant="outlined"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleDelete}
-                        variant="contained"
-                        color="error"
-                        sx={{ borderRadius: 2, textTransform: 'none' }}
-                    >
-                        Remove
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                onConfirm={handleDelete}
+                title="Remove expense type"
+                message={<>Are you sure you want to remove <strong>{selectedExpenseType?.expenseName}</strong>?</>}
+                confirmLabel="Remove"
+            />
 
         </PageLayout>
     );
