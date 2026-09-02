@@ -221,6 +221,50 @@ const SettingsPage = () => {
         }
     };
 
+    const renderMobileExpenseTypeRow = (type) => (
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.5}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                    <Typography variant="body2" fontWeight={600} noWrap>{type.expenseName}</Typography>
+                    <Chip
+                        label={type.isRecurring ? 'Recurring' : 'One-time'}
+                        size="small"
+                        color={type.isRecurring ? 'primary' : 'default'}
+                        sx={{ borderRadius: 1.5 }}
+                    />
+                </Box>
+                <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                    {formatCurrency(type.amount)}
+                </Typography>
+                {(type.startDate || type.endDate) && (
+                    <Typography variant="caption" color="text.secondary" display="block">
+                        {formatDate(type.startDate)} – {type.endDate ? formatDate(type.endDate) : 'Ongoing'}
+                    </Typography>
+                )}
+            </Box>
+            <Box sx={{ flexShrink: 0 }}>
+                {type.isSystemManaged ? (
+                    <Tooltip title="Auto-managed by system">
+                        <Typography variant="caption" color="text.secondary">Auto</Typography>
+                    </Tooltip>
+                ) : (
+                    <Box display="flex" gap={0.5}>
+                        <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => handleOpenEdit(type)}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                            <IconButton size="small" color="error" onClick={() => handleOpenDelete(type)}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                )}
+            </Box>
+        </Box>
+    );
+
     return (
         <PageLayout sidebar={<Sidebar />}>
 
@@ -270,6 +314,8 @@ const SettingsPage = () => {
                         columns={COLUMNS}
                         rows={filteredTypes}
                         renderCell={renderCell}
+                        mobileRenderRow={renderMobileExpenseTypeRow}
+                        hideMobileHeader
                         emptyMessage="No expense types found. Click Add expense type to get started."
                         maxHeight={400}
                     />

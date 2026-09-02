@@ -293,6 +293,33 @@ const BankInfoPage = () => {
         }
     };
 
+    const renderMobileCreditCardRow = (card) => (
+        <Box display="flex" alignItems="center" gap={1.5}>
+            <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" fontWeight={600} noWrap>{card.cardName}</Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                    {formatCurrency(card.creditLimit)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                    {formatDate(card.startDate, { year: 'numeric', month: 'short' })}
+                </Typography>
+            </Box>
+            <Box display="flex" gap={0.5}>
+                <Tooltip title="Edit">
+                    <IconButton size="small" onClick={() => handleOpenEditCreditCard(card)}>
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => handleOpenDeleteCreditCard(card)}>
+                        <DeleteIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+        </Box>
+    );
+
     const renderRunningTotalCell = (account, col) => {
         switch (col.key) {
             case 'bank':
@@ -322,6 +349,44 @@ const BankInfoPage = () => {
                 return null;
         }
     };
+
+    const renderMobileRunningTotalRow = (account) => (
+        <Box>
+            <Typography variant="body2" fontWeight={600}>{account.bankName}</Typography>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                {account.accountType}
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 0.5, columnGap: 2 }}>
+                <Typography variant="caption" color="text.secondary">Initial opening</Typography>
+                <Typography variant="body2" textAlign="right">{formatCurrency(account.initialOpeningBalance)}</Typography>
+
+                <Typography variant="caption" color="text.secondary">Total deposits</Typography>
+                <Typography variant="body2" fontWeight={600} color="success.main" textAlign="right">
+                    {formatCurrency(account.totalDeposits)}
+                </Typography>
+
+                <Typography variant="caption" color="text.secondary">Total interest</Typography>
+                <Typography variant="body2" fontWeight={600} color="success.main" textAlign="right">
+                    {formatCurrency(account.totalInterest)}
+                </Typography>
+
+                <Typography variant="caption" color="text.secondary">Total withdrawals</Typography>
+                <Typography variant="body2" fontWeight={600} color="error.main" textAlign="right">
+                    {formatCurrency(account.totalWithdrawals)}
+                </Typography>
+
+                <Typography variant="caption" color="text.secondary">Current balance</Typography>
+                <Typography variant="body2" fontWeight={600} textAlign="right">
+                    {formatCurrency(account.currentBalance)}
+                </Typography>
+
+                <Typography variant="caption" color="text.secondary">Months tracked</Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="right">
+                    {account.monthsTracked} {account.monthsTracked === 1 ? 'month' : 'months'}
+                </Typography>
+            </Box>
+        </Box>
+    );
 
     return (
         <PageLayout sidebar={<Sidebar />}>
@@ -439,6 +504,7 @@ const BankInfoPage = () => {
                         columns={CREDIT_CARD_COLUMNS}
                         rows={creditCards}
                         renderCell={renderCreditCardCell}
+                        mobileRenderRow={renderMobileCreditCardRow}
                         emptyMessage="No credit cards added yet. Click Add card to get started."
                         maxHeight={300}
                     />
@@ -459,6 +525,8 @@ const BankInfoPage = () => {
                         rows={runningTotals}
                         getRowKey={(row) => row.accountPublicId}
                         renderCell={renderRunningTotalCell}
+                        mobileRenderRow={renderMobileRunningTotalRow}
+                        hideMobileHeader
                         emptyMessage="No data available yet."
                     />
                 )}

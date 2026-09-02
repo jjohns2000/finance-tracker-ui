@@ -9,6 +9,7 @@ import {
     DialogActions,
     MenuItem,
     TextField,
+    Select,
     IconButton,
     CircularProgress,
     Tooltip,
@@ -22,13 +23,13 @@ import { extractStatement, checkDuplicates, importStatement } from '../api/state
 import { useSnackbar } from '../context/SnackbarContext';
 import { formatCurrency } from '../utils/format';
 
-const STEP = { UPLOAD: 'upload', EXTRACTING: 'extracting', PREVIEW: 'preview', IMPORTING: 'importing', DONE: 'done' };
+const STEP = { AGREEMENT: 'agreement', UPLOAD: 'upload', EXTRACTING: 'extracting', PREVIEW: 'preview', IMPORTING: 'importing', DONE: 'done' };
 
 const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = [], onImported }) => {
     const { showSnackbar } = useSnackbar();
     const fileInputRef = useRef();
     const [open, setOpen] = useState(false);
-    const [step, setStep] = useState(STEP.UPLOAD);
+    const [step, setStep] = useState(STEP.AGREEMENT);
     const [dragging, setDragging] = useState(false);
     const [statementType, setStatementType] = useState('bank');
     const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -39,7 +40,9 @@ const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = 
     const [pendingImport, setPendingImport] = useState(null);
 
     const reset = () => {
-        setStep(STEP.UPLOAD);
+        // Every upload re-shows the agreement — each file is a new instance of
+        // sharing data with the AI extraction service, so consent isn't cached.
+        setStep(STEP.AGREEMENT);
         setDragging(false);
         setStatementType('bank');
         setSelectedAccountId('');
@@ -223,8 +226,61 @@ const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = 
                 disableEscapeKeyDown
                 fullWidth
                 maxWidth={step === STEP.PREVIEW ? 'lg' : 'sm'}
-                PaperProps={{ sx: { borderRadius: 3 } }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        ...(step === STEP.PREVIEW && {
+                            height: '85vh',
+                            display: 'flex',
+                            flexDirection: 'column'
+                        })
+                    }
+                }}
             >
+                {/* ─── Agreement step ──────────────────────────── */}
+                {step === STEP.AGREEMENT && (
+                    <>
+                        <DialogTitle sx={{ fontWeight: 700 }}>Before You Upload</DialogTitle>
+                        <DialogContent>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                Please review the following before uploading a statement:
+                            </Typography>
+                            <Box component="ul" sx={{ pl: 3, m: 0, color: 'text.secondary' }}>
+                                <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                    Extracting transactions from your statement uses AI (Claude) to read the file —
+                                    your file is sent to that AI service for processing.
+                                </Typography>
+                                <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                    We do not store or control this data once it's sent for processing — treat
+                                    the upload as shared with a third party.
+                                </Typography>
+                                <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                    Before uploading, please review your statement and redact or remove personal
+                                    information you don't want shared — full account numbers, names, SIN/SSN, or
+                                    other identifying details.
+                                </Typography>
+                                <Typography component="li" variant="body2" sx={{ mb: 1 }}>
+                                    This is your responsibility — please exercise due diligence before uploading
+                                    any file.
+                                </Typography>
+                            </Box>
+                        </DialogContent>
+                        <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                            <Button onClick={handleClose} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={() => setStep(STEP.UPLOAD)}
+                                variant="contained"
+                                startIcon={<CheckIcon />}
+                                sx={{ borderRadius: 2, textTransform: 'none' }}
+                            >
+                                Agree & Continue
+                            </Button>
+                        </DialogActions>
+                    </>
+                )}
+
                 {/* ─── Upload step ─────────────────────────────── */}
                 {step === STEP.UPLOAD && (
                     <>
@@ -294,10 +350,10 @@ const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = 
                 {/* ─── Preview step ────────────────────────────── */}
                 {step === STEP.PREVIEW && (
                     <>
-                        <DialogTitle sx={{ fontWeight: 700 }}>Review Transactions</DialogTitle>
-                        <DialogContent>
+                        <DialogTitle sx={{ fontWeight: 700, flexShrink: 0 }}>Review Transactions</DialogTitle>
+                        <DialogContent sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
                             {/* Account + type selector */}
-                            <Box display="flex" gap={2} mb={2} mt={1} flexWrap="wrap" alignItems="center">
+                            <Box display="flex" gap={2} mb={2} mt={1} flexWrap="wrap" alignItems="center" sx={{ flexShrink: 0 }}>
                                 <TextField
                                     select label="Statement type"
                                     value={statementType}
@@ -351,146 +407,176 @@ const StatementUploader = ({ accounts, creditCards, expenseTypes, employments = 
                                 </Box>
                             </Box>
 
-                            {/* Table header */}
-                            <Box
-                                sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: '36px 100px 2fr 100px 80px 220px',
-                                    px: 1.5, py: 1,
-                                    bgcolor: 'background.default',
-                                    borderRadius: '8px 8px 0 0',
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    borderBottom: 'none'
-                                }}
-                            >
-                                {['', 'Date', 'Description', 'Amount', 'Type', 'Category / Income'].map((col, i) => (
-                                    <Typography key={i} variant="caption" color="text.secondary" fontWeight={600}>
-                                        {col}
-                                    </Typography>
-                                ))}
-                            </Box>
-
-                            {/* Table rows */}
-                            <Box
-                                sx={{
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    borderRadius: '0 0 8px 8px',
-                                    maxHeight: 400,
-                                    overflowY: 'auto'
-                                }}
-                            >
-                                {rows.map((row, index) => (
-                                    <Box
-                                        key={row.id}
-                                        sx={{
-                                            display: 'grid',
-                                            gridTemplateColumns: '36px 100px 2fr 100px 80px 220px',
-                                            px: 1.5, py: 1,
-                                            alignItems: 'center',
-                                            borderBottom: index < rows.length - 1 ? '1px solid' : 'none',
-                                            borderColor: 'divider',
-                                            '&:hover': { bgcolor: 'background.default' }
-                                        }}
-                                    >
-                                        {/* Remove */}
-                                        <Tooltip title="Remove row">
-                                            <IconButton size="small" color="error" onClick={() => handleRemoveRow(row.id)}>
-                                                <DeleteIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                        </Tooltip>
-
-                                        {/* Date — local time to avoid UTC shift */}
-                                        <Typography variant="caption" color="text.secondary">
-                                            {(() => {
-                                                const [y, m, d] = row.date.split('-');
-                                                return new Date(parseInt(y), parseInt(m) - 1, parseInt(d))
-                                                    .toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-                                            })()}
-                                        </Typography>
-
-                                        {/* Description */}
-                                        <Typography variant="body2" noWrap sx={{ pr: 1 }}>
-                                            {row.description}
-                                        </Typography>
-
-                                        {/* Amount */}
+                            {/* Transactions table */}
+                            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+                                {/* Header */}
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '100px 2fr 110px 130px 240px 44px',
+                                        columnGap: 1.5,
+                                        px: 2, py: 1.5,
+                                        bgcolor: 'background.default',
+                                        borderBottom: '1px solid',
+                                        borderColor: 'divider',
+                                        flexShrink: 0
+                                    }}
+                                >
+                                    {['Date', 'Description', 'Amount', 'Type', 'Category / Income', ''].map((col, i) => (
                                         <Typography
-                                            variant="body2"
+                                            key={i}
+                                            variant="caption"
+                                            color="text.secondary"
                                             fontWeight={600}
-                                            color={row.type === 'debit' ? 'error.main' : 'success.main'}
+                                            textAlign={col === 'Amount' ? 'right' : 'left'}
                                         >
-                                            {formatCurrency(row.amount)}
+                                            {col}
                                         </Typography>
+                                    ))}
+                                </Box>
 
-                                        {/* Type toggle */}
-                                        <Box display="flex" gap={0.5}>
-                                            {['debit', 'credit'].map(t => (
+                                {/* Rows */}
+                                <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                                    {rows.map((row, index) => {
+                                        const needsCategory = row.type === 'debit' && !row.expenseTypeId;
+                                        return (
+                                            <Box
+                                                key={row.id}
+                                                sx={{
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '100px 2fr 110px 130px 240px 44px',
+                                                    columnGap: 1.5,
+                                                    px: 2, py: 1.25,
+                                                    alignItems: 'center',
+                                                    borderBottom: index < rows.length - 1 ? '1px solid' : 'none',
+                                                    borderColor: 'divider',
+                                                    '&:hover': { bgcolor: 'action.hover' }
+                                                }}
+                                            >
+                                                {/* Date — local time to avoid UTC shift */}
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {(() => {
+                                                        const [y, m, d] = row.date.split('-');
+                                                        return new Date(parseInt(y), parseInt(m) - 1, parseInt(d))
+                                                            .toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+                                                    })()}
+                                                </Typography>
+
+                                                {/* Description */}
+                                                <Tooltip title={row.description} placement="top-start">
+                                                    <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+                                                        {row.description}
+                                                    </Typography>
+                                                </Tooltip>
+
+                                                {/* Amount */}
+                                                <Typography
+                                                    variant="body2"
+                                                    fontWeight={600}
+                                                    textAlign="right"
+                                                    color={row.type === 'debit' ? 'error.main' : 'success.main'}
+                                                    sx={{ fontVariantNumeric: 'tabular-nums' }}
+                                                >
+                                                    {formatCurrency(row.amount)}
+                                                </Typography>
+
+                                                {/* Type toggle — single connected segmented control */}
                                                 <Box
-                                                    key={t}
-                                                    onClick={() => handleRowChange(row.id, 'type', t)}
                                                     sx={{
-                                                        px: 0.75, py: 0.25,
-                                                        borderRadius: 1,
-                                                        fontSize: 10,
-                                                        fontWeight: 600,
-                                                        cursor: 'pointer',
-                                                        bgcolor: row.type === t
-                                                            ? t === 'debit' ? 'error.main' : 'success.main'
-                                                            : 'action.hover',
-                                                        color: row.type === t ? '#fff' : 'text.secondary',
-                                                        userSelect: 'none'
+                                                        display: 'inline-flex',
+                                                        width: 'fit-content',
+                                                        borderRadius: 999,
+                                                        border: '1px solid',
+                                                        borderColor: 'divider',
+                                                        overflow: 'hidden'
                                                     }}
                                                 >
-                                                    {t}
+                                                    {['debit', 'credit'].map(t => (
+                                                        <Box
+                                                            key={t}
+                                                            onClick={() => handleRowChange(row.id, 'type', t)}
+                                                            sx={{
+                                                                px: 1.25, py: 0.5,
+                                                                fontSize: 12,
+                                                                fontWeight: 600,
+                                                                textTransform: 'capitalize',
+                                                                cursor: 'pointer',
+                                                                userSelect: 'none',
+                                                                bgcolor: row.type === t
+                                                                    ? t === 'debit' ? 'error.main' : 'success.main'
+                                                                    : 'transparent',
+                                                                color: row.type === t ? '#fff' : 'text.secondary',
+                                                                transition: 'background-color 0.15s ease'
+                                                            }}
+                                                        >
+                                                            {t}
+                                                        </Box>
+                                                    ))}
                                                 </Box>
-                                            ))}
-                                        </Box>
 
-                                        {/* Category / Income dropdown */}
-                                        {row.type === 'debit' ? (
-                                            // Expense type dropdown for debits
-                                            <TextField
-                                                select size="small"
-                                                value={row.expenseTypeId}
-                                                onChange={(e) => handleRowChange(row.id, 'expenseTypeId', e.target.value)}
-                                                sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
-                                                displayEmpty
-                                            >
-                                                <MenuItem value=""><em>Skip</em></MenuItem>
-                                                {oneTimeTypes.map(et => (
-                                                    <MenuItem key={et.id} value={et.id}>{et.expenseName}</MenuItem>
-                                                ))}
-                                            </TextField>
-                                        ) : (
-                                            // Income type dropdown for credits
-                                            <TextField
-                                                select size="small"
-                                                value={row.creditType || 'deposit'}
-                                                onChange={(e) => handleRowChange(row.id, 'creditType', e.target.value)}
-                                                sx={{ '& .MuiInputBase-root': { fontSize: 12 } }}
-                                            >
-                                                <MenuItem value="skip"><em>Skip</em></MenuItem>
-                                                <MenuItem value="deposit">General deposit</MenuItem>
-                                                {employments.map(emp => (
-                                                    <MenuItem key={emp.id} value={`salary:${emp.id}`}>
-                                                        Salary — {emp.companyName}
-                                                    </MenuItem>
-                                                ))}
-                                            </TextField>
-                                        )}
-                                    </Box>
-                                ))}
+                                                {/* Category / Income dropdown */}
+                                                {row.type === 'debit' ? (
+                                                    // Expense type dropdown for debits
+                                                    // NOTE: uses raw Select (not TextField select) — TextField's
+                                                    // SelectProps/slotProps.select don't forward renderValue in this
+                                                    // MUI version, so the empty-value "Skip" label silently fails to render.
+                                                    <Select
+                                                        size="small"
+                                                        value={row.expenseTypeId}
+                                                        onChange={(e) => handleRowChange(row.id, 'expenseTypeId', e.target.value)}
+                                                        displayEmpty
+                                                        renderValue={(val) => val
+                                                            ? (oneTimeTypes.find(t => t.id === val)?.expenseName || '')
+                                                            : 'Skip'}
+                                                        sx={{
+                                                            fontSize: 13,
+                                                            ...(needsCategory && {
+                                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'warning.main' }
+                                                            })
+                                                        }}
+                                                    >
+                                                        <MenuItem value=""><em>Skip</em></MenuItem>
+                                                        {oneTimeTypes.map(et => (
+                                                            <MenuItem key={et.id} value={et.id}>{et.expenseName}</MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                ) : (
+                                                    // Income type dropdown for credits
+                                                    <TextField
+                                                        select size="small"
+                                                        value={row.creditType || 'deposit'}
+                                                        onChange={(e) => handleRowChange(row.id, 'creditType', e.target.value)}
+                                                        sx={{ '& .MuiInputBase-root': { fontSize: 13 } }}
+                                                    >
+                                                        <MenuItem value="skip"><em>Skip</em></MenuItem>
+                                                        <MenuItem value="deposit">General deposit</MenuItem>
+                                                        {employments.map(emp => (
+                                                            <MenuItem key={emp.id} value={`salary:${emp.id}`}>
+                                                                Salary — {emp.companyName}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                )}
+
+                                                {/* Remove */}
+                                                <Tooltip title="Remove row">
+                                                    <IconButton size="small" color="error" onClick={() => handleRemoveRow(row.id)}>
+                                                        <DeleteIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        );
+                                    })}
+                                </Box>
                             </Box>
 
-                            <Typography variant="caption" color="text.disabled" display="block" mt={1}>
+                            <Typography variant="caption" color="text.disabled" display="block" mt={1} sx={{ flexShrink: 0 }}>
                                 Debit rows set to "Skip" will not be imported.
                                 Credit rows set to "Skip" will not be imported.
                                 Salary credits are added to your monthly salary entries.
                             </Typography>
                         </DialogContent>
-                        <DialogActions sx={{ pb: 2, px: 3, gap: 1 }}>
+                        <DialogActions sx={{ pb: 2, px: 3, gap: 1, flexShrink: 0 }}>
                             <Button onClick={handleClose} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>
                                 Cancel
                             </Button>

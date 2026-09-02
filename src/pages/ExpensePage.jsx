@@ -17,7 +17,7 @@ import PageLayout from '../components/PageLayout';
 import PageCard, { hideScrollbar } from '../components/PageCard';
 import CreditCardIcon from '../components/CreditCardIcon';
 import CheckInWidget from '../components/CheckInWidget';
-import DataTable from '../components/ui/DataTable';
+import DataTable, { mobileColumnWidths } from '../components/ui/DataTable';
 import FormDialog from '../components/ui/FormDialog';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import LoadingState from '../components/ui/LoadingState';
@@ -60,7 +60,7 @@ const currentYear = new Date().getFullYear();
 
 const ACCOUNT_COLUMNS = [
     { key: 'bank', label: 'Bank', width: '2fr' },
-    { key: 'type', label: 'Type', width: '1fr' },
+    { key: 'type', label: 'Type', width: '1fr', mobileHidden: true },
     { key: 'withdrawal', label: 'Withdrawal', width: '1fr' }
 ];
 
@@ -497,6 +497,23 @@ const ExpensePage = () => {
         }
     };
 
+    const renderMobileAccountRow = (account) => {
+        const data = getSummaryForAccount(account);
+        return (
+            <Box sx={{ display: 'grid', gridTemplateColumns: mobileColumnWidths(ACCOUNT_COLUMNS), alignItems: 'center', columnGap: 1 }}>
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                        {account.accountType}
+                    </Typography>
+                </Box>
+                <Typography variant="body2" fontWeight={600} color="error.main" textAlign="right">
+                    {formatCurrency(data?.withdrawal)}
+                </Typography>
+            </Box>
+        );
+    };
+
     const renderExpenseTypeCell = (type, col, autoTooltip) => {
         const entry = getEntryForType(type.id);
         switch (col.key) {
@@ -578,6 +595,44 @@ const ExpensePage = () => {
         }
     };
 
+    const renderMobileCreditCardRow = (card) => {
+        const entry = getCreditCardEntry(card.id);
+        return (
+            <Box display="flex" alignItems="flex-start" gap={1.5}>
+                <CreditCardIcon color={card.cardColor || '#f44336'} size="sm" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={600} noWrap>{card.cardName}</Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 0.25, columnGap: 2, mt: 0.5 }}>
+                        <Typography variant="caption" color="text.secondary">Limit</Typography>
+                        <Typography variant="caption" color="text.secondary" textAlign="right">
+                            {formatCurrency(card.creditLimit)}
+                        </Typography>
+
+                        <Typography variant="caption" color="text.secondary">Bill</Typography>
+                        <Typography variant="caption" fontWeight={600} color={entry ? 'error.main' : 'text.secondary'} textAlign="right">
+                            {entry ? formatCurrency(entry.billAmount) : '—'}
+                        </Typography>
+
+                        <Typography variant="caption" color="text.secondary">Paid</Typography>
+                        <Typography variant="caption" fontWeight={600} color={entry ? 'success.main' : 'text.secondary'} textAlign="right">
+                            {entry ? formatCurrency(entry.amountPaid) : '—'}
+                        </Typography>
+
+                        <Typography variant="caption" color="text.secondary">Balance</Typography>
+                        <Typography variant="caption" fontWeight={600} color={entry?.balance > 0 ? 'error.main' : 'text.secondary'} textAlign="right">
+                            {entry ? formatCurrency(entry.balance) : '—'}
+                        </Typography>
+                    </Box>
+                </Box>
+                <Tooltip title={entry ? 'Edit entry' : 'Add entry'}>
+                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleOpenCreditCardEntry(card); }}>
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+        );
+    };
+
     const renderTransactionCell = (transaction, col) => {
         switch (col.key) {
             case 'date':
@@ -628,6 +683,52 @@ const ExpensePage = () => {
                 return null;
         }
     };
+
+    const renderMobileTransactionRow = (transaction) => (
+        <Box display="flex" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+                {transaction.isTransfer ? (
+                    <Box display="flex" alignItems="center" gap={0.5}>
+                        <SwapHorizIcon sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                            {transaction.fromAccountName} → {transaction.toAccountName}
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Typography variant="body2" fontWeight={600} noWrap>{transaction.expenseName}</Typography>
+                )}
+                <Typography variant="caption" color="text.secondary" display="block">
+                    {formatDate(transaction.transactionDate, { month: 'short', day: 'numeric' })}
+                    {' · '}
+                    {transaction.isTransfer ? 'Transfer' : transaction.paymentMethod}
+                </Typography>
+                {transaction.description && (
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                        {transaction.description}
+                    </Typography>
+                )}
+            </Box>
+            <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                <Typography variant="body2" fontWeight={600} color={transaction.isTransfer ? 'text.primary' : 'error.main'} noWrap>
+                    {formatCurrency(transaction.amount)}
+                </Typography>
+                <Box display="flex" gap={0.5} justifyContent="flex-end" mt={0.5}>
+                    {!transaction.isTransfer && (
+                        <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => handleOpenEditTransaction(transaction)}>
+                                <EditIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                    <Tooltip title="Delete">
+                        <IconButton size="small" color="error" onClick={() => handleOpenDeleteTransaction(transaction)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            </Box>
+        </Box>
+    );
 
     return (
         <PageLayout sidebar={<Sidebar />}>
@@ -680,6 +781,7 @@ const ExpensePage = () => {
                                 rows={accounts}
                                 getRowKey={(row) => row.publicId}
                                 renderCell={renderAccountCell}
+                                mobileRenderRow={renderMobileAccountRow}
                                 onRowClick={handleOpenEdit}
                                 emptyMessage="No accounts found."
                                 maxHeight={260}
@@ -738,6 +840,8 @@ const ExpensePage = () => {
                     rows={creditCards}
                     getRowKey={(row) => row.publicId}
                     renderCell={renderCreditCardCell}
+                    mobileRenderRow={renderMobileCreditCardRow}
+                    hideMobileHeader
                     onRowClick={handleOpenCreditCardEntry}
                     emptyMessage="No credit cards found. Add them in Bank Info."
                 />
@@ -776,11 +880,18 @@ const ExpensePage = () => {
 
             {/* Section 6 — Transactions */}
             <PageCard>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems={{ xs: 'stretch', sm: 'center' }}
+                    flexDirection={{ xs: 'column', sm: 'row' }}
+                    gap={{ xs: 1.5, sm: 0 }}
+                    mb={2}
+                >
                     <Typography variant="body2" color="text.secondary" fontWeight={600}>
                         Transactions — {MONTHS.find(m => m.value === month)?.label} {year}
                     </Typography>
-                    <Box display="flex" gap={1}>
+                    <Box display="flex" gap={1} flexWrap="wrap">
                         <StatementUploader
                             accounts={accounts}
                             creditCards={creditCards}
@@ -812,6 +923,8 @@ const ExpensePage = () => {
                     rows={filteredTransactions}
                     getRowKey={(row) => row.publicId}
                     renderCell={renderTransactionCell}
+                    mobileRenderRow={renderMobileTransactionRow}
+                    hideMobileHeader
                     emptyMessage={transactionSearch ? 'No transactions match your search.' : 'No transactions for this month. Click Add transaction to get started.'}
                     maxHeight={280}
                     bodySx={hideScrollbar}

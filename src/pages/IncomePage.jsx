@@ -10,7 +10,7 @@ import Sidebar from '../components/Sidebar';
 import PageLayout from '../components/PageLayout';
 import PageCard from '../components/PageCard';
 import CheckInWidget from '../components/CheckInWidget';
-import DataTable from '../components/ui/DataTable';
+import DataTable, { mobileColumnWidths } from '../components/ui/DataTable';
 import FormDialog from '../components/ui/FormDialog';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import LoadingState from '../components/ui/LoadingState';
@@ -48,7 +48,7 @@ const currentYear = new Date().getFullYear();
 
 const ACCOUNT_COLUMNS = [
     { key: 'bank', label: 'Bank', width: '2fr' },
-    { key: 'type', label: 'Type', width: '1fr' },
+    { key: 'type', label: 'Type', width: '1fr', mobileHidden: true },
     { key: 'deposit', label: 'Deposit', width: '1fr' },
     { key: 'interest', label: 'Interest', width: '1fr' }
 ];
@@ -305,6 +305,26 @@ const IncomePage = () => {
         }
     };
 
+    const renderMobileAccountRow = (account) => {
+        const data = getSummaryForAccount(account);
+        return (
+            <Box sx={{ display: 'grid', gridTemplateColumns: mobileColumnWidths(ACCOUNT_COLUMNS), alignItems: 'center', columnGap: 1 }}>
+                <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={500} noWrap>{account.bankName}</Typography>
+                    <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                        {account.accountType}
+                    </Typography>
+                </Box>
+                <Typography variant="body2" fontWeight={600} color="success.main" textAlign="right">
+                    {formatCurrency(data?.deposit)}
+                </Typography>
+                <Typography variant="body2" fontWeight={600} color="success.main" textAlign="right">
+                    {formatCurrency(data?.interest)}
+                </Typography>
+            </Box>
+        );
+    };
+
     const renderSalaryCell = (salary, col) => {
         switch (col.key) {
             case 'job':
@@ -377,6 +397,7 @@ const IncomePage = () => {
                                 rows={accounts}
                                 getRowKey={(row) => row.publicId}
                                 renderCell={renderAccountCell}
+                                mobileRenderRow={renderMobileAccountRow}
                                 onRowClick={handleOpenEdit}
                                 emptyMessage="No accounts found."
                                 maxHeight={260}

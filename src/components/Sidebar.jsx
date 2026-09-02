@@ -89,7 +89,7 @@ const Sidebar = () => {
                         py: 1.3,
                         mx: 1.5,
                         mb: 1,
-                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : ITEM_WIDTH_EXPANDED,
+                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : forceExpanded ? 'auto' : ITEM_WIDTH_EXPANDED,
                         height: 44,
                         overflow: 'hidden',
                         borderRadius: '999px',
@@ -142,7 +142,7 @@ const Sidebar = () => {
                         py: 1.3,
                         mx: 1.5,
                         mb: 1,
-                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : ITEM_WIDTH_EXPANDED,
+                        width: isCollapsed ? ITEM_WIDTH_COLLAPSED : forceExpanded ? 'auto' : ITEM_WIDTH_EXPANDED,
                         height: 44,
                         overflow: 'hidden',
                         borderRadius: '999px',
@@ -195,7 +195,12 @@ const Sidebar = () => {
                 }}
             >
                 {(forceExpanded || !collapsed) && (
-                    <Typography variant="subtitle1" fontWeight={700} noWrap sx={{ flex: 1, textAlign: 'center' }}>
+                    <Typography
+                        variant="subtitle1"
+                        fontWeight={700}
+                        noWrap
+                        sx={{ flex: 1, textAlign: forceExpanded ? 'left' : 'center', pl: forceExpanded ? 1 : 0 }}
+                    >
                         Finance Tracker
                     </Typography>
                 )}
